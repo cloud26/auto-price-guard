@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>价保助手</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+      background: #f5f5f7;
+      color: #1d1d1f;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+    }
+
+    /* ── 顶部状态栏 ── */
+    .header {
+      background: #fff;
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid #e5e5e5;
+    }
+
+    .header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .login-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .login-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ccc;
+      flex-shrink: 0;
+    }
+    .login-dot.online { background: #30d158; }
+    .login-dot.offline { background: #ff3b30; }
+    .login-dot.checking { background: #ff9f0a; }
+
+    .login-text {
+      font-size: 14px;
+      color: #666;
+      flex: 1;
+    }
+
+    .btn {
+      padding: 6px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:active { opacity: 0.7; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    .btn-primary {
+      background: #e54346;
+      color: #fff;
+    }
+
+    .btn-secondary {
+      background: #e8e8ed;
+      color: #1d1d1f;
+    }
+
+    /* ── 信息卡片区 ── */
+    .cards {
+      padding: 16px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px;
+    }
+
+    .card-title {
+      font-size: 12px;
+      color: #86868b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .status-item .label {
+      font-size: 12px;
+      color: #86868b;
+      margin-bottom: 2px;
+    }
+
+    .status-item .value {
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    .status-item .value.success { color: #30d158; }
+    .status-item .value.error { color: #ff3b30; }
+    .status-item .value.pending { color: #86868b; }
+    .status-item .value.highlight { color: #e54346; font-size: 18px; }
+
+    /* ── 设置 ── */
+    .settings-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .settings-row label {
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+
+    .settings-row select {
+      flex: 1;
+      padding: 6px 10px;
+      border: 1px solid #d2d2d7;
+      border-radius: 8px;
+      font-size: 14px;
+      background: #fff;
+      outline: none;
+    }
+
+    .action-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .action-row .btn {
+      flex: 1;
+      padding: 10px;
+      font-size: 14px;
+    }
+
+    /* ── 日志 ── */
+    .log-section {
+      flex: 1;
+      padding: 0 24px 16px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    .log-header {
+      font-size: 12px;
+      color: #86868b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .log-box {
+      flex: 1;
+      background: #1d1d1f;
+      border-radius: 10px;
+      padding: 12px;
+      overflow-y: auto;
+      font-family: "SF Mono", "Menlo", monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #a1a1a6;
+      user-select: text;
+    }
+
+    .log-box .log-line {
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .log-box .log-line.error { color: #ff6961; }
+    .log-box .log-line.success { color: #a8e6a3; }
+
+    /* ── 底部 ── */
+    .footer {
+      padding: 8px 24px 12px;
+      text-align: center;
+      font-size: 11px;
+      color: #86868b;
+    }
+
+    /* 运行中动画 */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .running { animation: pulse 1.5s infinite; }
+
+    /* ── 更新提示 ── */
+    .update-bar {
+      display: none;
+      background: #007aff;
+      color: #fff;
+      padding: 8px 24px;
+      font-size: 13px;
+      align-items: center;
+      gap: 10px;
+    }
+    .update-bar.show { display: flex; }
+    .update-bar .update-text { flex: 1; }
+    .update-bar .btn-update {
+      padding: 4px 12px;
+      border: 1px solid rgba(255,255,255,0.6);
+      border-radius: 6px;
+      background: transparent;
+      color: #fff;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .update-bar .btn-update:hover { background: rgba(255,255,255,0.15); }
+  </style>
+</head>
+<body>
+  <div class="update-bar" id="updateBar">
+    <span class="update-text" id="updateText"></span>
+    <button class="btn-update" id="updateBtn" onclick="handleUpdate()">下载更新</button>
+  </div>
+
+  <div class="header">
+    <h1>价保助手</h1>
+    <div class="login-bar">
+      <div class="login-dot checking" id="loginDot"></div>
+      <span class="login-text" id="loginText">检测登录状态...</span>
+      <button class="btn btn-primary" id="loginBtn" style="display:none" onclick="handleLogin()">去登录</button>
+      <button class="btn btn-secondary" id="logoutBtn" style="display:none" onclick="handleLogout()">退出登录</button>
+    </div>
+  </div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="card-title">运行状态</div>
+      <div class="status-grid">
+        <div class="status-item">
+          <div class="label">上次运行</div>
+          <div class="value pending" id="lastRun">--</div>
+        </div>
+        <div class="status-item">
+          <div class="label">运行结果</div>
+          <div class="value pending" id="lastResult">--</div>
+        </div>
+        <div class="status-item">
+          <div class="label">下次运行</div>
+          <div class="value pending" id="nextRun">--</div>
+        </div>
+        <div class="status-item">
+          <div class="label">当前状态</div>
+          <div class="value pending" id="currentStatus">等待中</div>
+        </div>
+        <div class="status-item">
+          <div class="label">累计省钱</div>
+          <div class="value highlight" id="totalSaved">¥0.00</div>
+        </div>
+        <div class="status-item">
+          <div class="label">成功次数</div>
+          <div class="value pending" id="totalCount">0 件</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">设置</div>
+      <div class="settings-row">
+        <label>执行间隔</label>
+        <select id="intervalSelect" onchange="handleIntervalChange()">
+          <option value="0.5">30 分钟</option>
+          <option value="1">1 小时</option>
+          <option value="2" selected>2 小时</option>
+          <option value="4">4 小时</option>
+          <option value="6">6 小时</option>
+          <option value="8">8 小时</option>
+          <option value="12">12 小时</option>
+          <option value="24">24 小时</option>
+        </select>
+      </div>
+      <div class="action-row">
+        <button class="btn btn-primary" id="runBtn" onclick="handleRunNow()">立即执行</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="log-section">
+    <div class="log-header">运行日志</div>
+    <div class="log-box" id="logBox"></div>
+  </div>
+
+  <div class="footer">关闭窗口后程序将在后台继续运行 &middot; 从 Dock 图标重新打开 &middot; <span id="appVersion"></span></div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
