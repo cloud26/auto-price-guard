@@ -1,131 +1,239 @@
-const logBox = document.getElementById("logBox");
-const loginDot = document.getElementById("loginDot");
-const loginText = document.getElementById("loginText");
-const loginBtn = document.getElementById("loginBtn");
-const logoutBtn = document.getElementById("logoutBtn");
-const lastRunEl = document.getElementById("lastRun");
-const lastResultEl = document.getElementById("lastResult");
-const nextRunEl = document.getElementById("nextRun");
-const currentStatusEl = document.getElementById("currentStatus");
-const intervalSelect = document.getElementById("intervalSelect");
-const runBtn = document.getElementById("runBtn");
-const totalSavedEl = document.getElementById("totalSaved");
-const totalCountEl = document.getElementById("totalCount");
-const updateBar = document.getElementById("updateBar");
-const updateText = document.getElementById("updateText");
-const updateBtn = document.getElementById("updateBtn");
-const appVersionEl = document.getElementById("appVersion");
+const $ = (id) => document.getElementById(id);
+
+const greetingHelloEl = $("greetingHello");
+const loginPill = $("loginPill");
+const loginDot = $("loginDot");
+const loginText = $("loginText");
+const loginSep = $("loginSep");
+const loginAction = $("loginAction");
+
+const heroIntEl = $("heroInt");
+const heroDecEl = $("heroDec");
+const heroCountEl = $("heroCount");
+
+const runStateEl = $("runState");
+const runStateDot = $("runStateDot");
+const runStateText = $("runStateText");
+const progressStrip = $("progressStrip");
+
+const lastRunEl = $("lastRun");
+const lastRunMetaEl = $("lastRunMeta");
+const lastResultEl = $("lastResult");
+const lastResultMetaEl = $("lastResultMeta");
+const nextRunEl = $("nextRun");
+const nextRunMetaEl = $("nextRunMeta");
+
+const intervalSelect = $("intervalSelect");
+const runBtn = $("runBtn");
+const runBtnText = $("runBtnText");
+
+const logBox = $("logBox");
+const updateBar = $("updateBar");
+const updateText = $("updateText");
+const updateBtn = $("updateBtn");
+const appVersionEl = $("appVersion");
 
 let isLoggedIn = false;
-let updateState = "idle"; // idle | available | downloading | downloaded
+let lastStatus = null;
+let updateState = "idle";
 
-// ── 格式化时间 ──
-function formatTime(isoStr) {
-  if (!isoStr) return "--";
+const pad = (n) => String(n).padStart(2, "0");
+
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 6) return "凌晨好";
+  if (h < 12) return "上午好";
+  if (h < 14) return "中午好";
+  if (h < 18) return "下午好";
+  return "晚上好";
+}
+greetingHelloEl.textContent = greeting();
+
+function formatDateTime(isoStr) {
+  if (!isoStr) return null;
   const d = new Date(isoStr);
-  const pad = (n) => String(n).padStart(2, "0");
   return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function formatRelativeTime(isoStr) {
-  if (!isoStr) return "--";
+function formatRelative(isoStr) {
+  if (!isoStr) return null;
   const diff = new Date(isoStr) - Date.now();
-  if (diff < 0) return "即将执行";
-  const mins = Math.ceil(diff / 60000);
+  if (diff < 60000) return "即将执行";
+  const mins = Math.round(diff / 60000);
   if (mins < 60) return `${mins} 分钟后`;
   const hours = Math.floor(mins / 60);
-  const remainMins = mins % 60;
-  return `${hours}h ${remainMins}m 后`;
+  const remain = mins % 60;
+  return remain ? `${hours}h ${remain}m 后` : `${hours} 小时后`;
 }
 
-// ── 更新 UI ──
-function updateStatus(status) {
-  intervalSelect.value = String(status.intervalHours);
+function formatPast(isoStr) {
+  if (!isoStr) return null;
+  const diff = Date.now() - new Date(isoStr);
+  if (diff < 60000) return "刚刚";
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins} 分钟前`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  const days = Math.floor(hours / 24);
+  return `${days} 天前`;
+}
 
-  lastRunEl.textContent = formatTime(status.lastRunTime);
-  lastRunEl.className = "value" + (status.lastRunTime ? "" : " pending");
+function setDot(el, kind, pulsing) {
+  el.className = `dot ${kind}${pulsing ? " pulsing" : ""}`;
+}
+
+// ── Hero ──
+function renderHero(status) {
+  const amount = status.totalSaved || 0;
+  const [intPart, decPart] = amount.toFixed(2).split(".");
+  heroIntEl.textContent = Number(intPart).toLocaleString("en-US");
+  heroDecEl.textContent = "." + decPart;
+  heroCountEl.textContent = status.totalSuccessCount || 0;
+}
+
+// ── Run state card ──
+function renderRunCard(status) {
+  const running = !!status.isRunning;
+  const scheduled = !!status.schedulerRunning;
+
+  if (running) {
+    setDot(runStateDot, "accent", true);
+    runStateText.textContent = "运行中…";
+    runStateEl.classList.add("active");
+    progressStrip.classList.add("show");
+  } else if (scheduled) {
+    setDot(runStateDot, "success", false);
+    runStateText.textContent = "定时运行中";
+    runStateEl.classList.remove("active");
+    progressStrip.classList.remove("show");
+  } else {
+    setDot(runStateDot, "muted", false);
+    runStateText.textContent = "未启动";
+    runStateEl.classList.remove("active");
+    progressStrip.classList.remove("show");
+  }
+
+  const lastStr = formatDateTime(status.lastRunTime);
+  lastRunEl.textContent = lastStr || "--";
+  lastRunEl.classList.toggle("pending", !lastStr);
+  lastRunMetaEl.textContent = status.lastRunTime ? formatPast(status.lastRunTime) : "";
 
   if (status.lastRunResult) {
-    lastResultEl.textContent = status.lastRunResult;
-    const isSuccess = status.lastRunResult.startsWith("成功");
-    lastResultEl.className = "value " + (isSuccess ? "success" : "error");
+    const raw = status.lastRunResult;
+    const ok = raw.startsWith("成功");
+    const err = raw.startsWith("出错");
+    lastResultEl.textContent = raw.startsWith("成功 ") ? raw.slice(3) : raw;
+    lastResultEl.classList.toggle("success", ok);
+    lastResultEl.classList.toggle("danger", err);
+    lastResultEl.classList.remove("pending");
+    lastResultMetaEl.textContent = ok ? "价保退款" : err ? "执行失败" : "";
   } else {
     lastResultEl.textContent = "--";
-    lastResultEl.className = "value pending";
+    lastResultEl.className = "stat-value pending";
+    lastResultMetaEl.textContent = "";
   }
 
-  nextRunEl.textContent = formatRelativeTime(status.nextRunTime);
-  nextRunEl.className = "value";
+  const nextRel = formatRelative(status.nextRunTime);
+  nextRunEl.textContent = nextRel || "--";
+  nextRunEl.classList.toggle("pending", !nextRel);
+  nextRunMetaEl.textContent = status.nextRunTime ? formatDateTime(status.nextRunTime) : "";
+}
 
-  // 累计数据
-  totalSavedEl.textContent = `¥${(status.totalSaved || 0).toFixed(2)}`;
-  totalSavedEl.className = "value" + (status.totalSaved > 0 ? " highlight" : " pending");
-  totalCountEl.textContent = `${status.totalSuccessCount || 0} 件`;
-
-  if (status.isRunning) {
-    currentStatusEl.textContent = "运行中...";
-    currentStatusEl.className = "value success running";
+// ── Run button ──
+function renderRunBtn(status) {
+  const running = !!status.isRunning;
+  if (running) {
     runBtn.disabled = true;
-    runBtn.textContent = "运行中...";
-  } else if (status.schedulerRunning) {
-    currentStatusEl.textContent = "定时运行中";
-    currentStatusEl.className = "value success";
-    runBtn.disabled = !isLoggedIn;
-    runBtn.textContent = "立即执行";
+    runBtn.classList.add("loading");
+    runBtnText.textContent = "运行中…";
   } else {
-    currentStatusEl.textContent = "未启动";
-    currentStatusEl.className = "value pending";
     runBtn.disabled = !isLoggedIn;
-    runBtn.textContent = "立即执行";
+    runBtn.classList.remove("loading");
+    runBtnText.textContent = "立即执行";
   }
 }
 
+// ── Top-level status update ──
+function updateStatus(status) {
+  lastStatus = status;
+  intervalSelect.value = String(status.intervalHours);
+  renderHero(status);
+  renderRunCard(status);
+  renderRunBtn(status);
+  if (status.appVersion) appVersionEl.textContent = `v${status.appVersion}`;
+}
+
+// ── Login pill ──
 function setLoginStatus(loggedIn) {
   isLoggedIn = loggedIn;
-  loginDot.className = "login-dot " + (loggedIn ? "online" : "offline");
-  loginText.textContent = loggedIn ? "已登录京东" : "未登录，请先登录";
-  loginBtn.style.display = loggedIn ? "none" : "block";
-  logoutBtn.style.display = loggedIn ? "block" : "none";
-  runBtn.disabled = !loggedIn;
+  if (loggedIn) {
+    setDot(loginDot, "success", true);
+    loginText.textContent = "已登录京东";
+    loginSep.style.display = "";
+    loginAction.style.display = "";
+    loginAction.textContent = "退出";
+    loginAction.classList.remove("primary");
+    loginAction.onclick = () => window.api.logout();
+  } else {
+    setDot(loginDot, "danger", false);
+    loginText.textContent = "未登录";
+    loginSep.style.display = "";
+    loginAction.style.display = "";
+    loginAction.textContent = "去登录";
+    loginAction.classList.add("primary");
+    loginAction.onclick = () => window.api.openLogin();
+  }
+  if (lastStatus) renderRunBtn(lastStatus);
 }
 
-function appendLog(msg) {
+// ── Log ──
+function classifyLog(msg) {
+  if (/出错|失败|过期/.test(msg)) return "danger";
+  if (/成功|完成|已点击/.test(msg)) return "success";
+  if (/命中|退款|价保|¥/.test(msg)) return "accent";
+  return "";
+}
+
+// Split "[2025/4/21 12:02:05] msg" into ts + rest. Keep raw if no match.
+function appendLog(raw) {
   const line = document.createElement("div");
   line.className = "log-line";
-  if (msg.includes("出错") || msg.includes("失败") || msg.includes("过期")) {
-    line.className += " error";
-  } else if (msg.includes("成功") || msg.includes("完成") || msg.includes("已点击")) {
-    line.className += " success";
+  const cls = classifyLog(raw);
+  if (cls) line.classList.add(cls);
+
+  const m = raw.match(/^\[([^\]]+)\]\s*(.*)$/);
+  if (m) {
+    const ts = document.createElement("span");
+    ts.className = "ts";
+    ts.textContent = `[${m[1]}] `;
+    line.appendChild(ts);
+    line.appendChild(document.createTextNode(m[2]));
+  } else {
+    line.textContent = raw;
   }
-  line.textContent = msg;
-  logBox.appendChild(line);
+
+  // Insert before the cursor element
+  const cursor = logBox.querySelector(".log-cursor");
+  logBox.insertBefore(line, cursor);
   logBox.scrollTop = logBox.scrollHeight;
 }
 
-// ── 事件处理 ──
-function handleLogin() {
-  window.api.openLogin();
-}
+// ── Events ──
+runBtn.onclick = () => window.api.runNow();
+intervalSelect.onchange = () => window.api.updateInterval(parseFloat(intervalSelect.value));
+updateBtn.onclick = () => {
+  if (updateState === "available") {
+    updateState = "downloading";
+    window.api.downloadUpdate();
+  } else if (updateState === "downloaded") {
+    window.api.installUpdate();
+  }
+};
 
-async function handleLogout() {
-  await window.api.logout();
-}
-
-function handleRunNow() {
-  window.api.runNow();
-}
-
-function handleIntervalChange() {
-  const hours = parseFloat(intervalSelect.value);
-  window.api.updateInterval(hours);
-}
-
-// ── 监听主进程事件 ──
 window.api.onLog((msg) => appendLog(msg));
-window.api.onStatusUpdate((status) => updateStatus(status));
+window.api.onStatusUpdate((status) => updateStatus({ ...lastStatus, ...status }));
 window.api.onLoginStatus((loggedIn) => setLoginStatus(loggedIn));
 
-// ── 更新事件 ──
 window.api.onUpdateAvailable((version) => {
   updateState = "available";
   updateBar.classList.add("show");
@@ -133,13 +241,11 @@ window.api.onUpdateAvailable((version) => {
   updateBtn.textContent = "下载更新";
   updateBtn.disabled = false;
 });
-
 window.api.onUpdateProgress((percent) => {
   updateText.textContent = `正在下载更新... ${percent}%`;
   updateBtn.disabled = true;
   updateBtn.textContent = "下载中";
 });
-
 window.api.onUpdateDownloaded(() => {
   updateState = "downloaded";
   updateText.textContent = "新版本已下载完成";
@@ -147,44 +253,28 @@ window.api.onUpdateDownloaded(() => {
   updateBtn.disabled = false;
 });
 
-function handleUpdate() {
-  if (updateState === "available") {
-    updateState = "downloading";
-    window.api.downloadUpdate();
-  } else if (updateState === "downloaded") {
-    window.api.installUpdate();
-  }
-}
-
-// ── 定时刷新下次运行倒计时 ──
+// Refresh relative times every 30s.
 setInterval(async () => {
-  const status = await window.api.getStatus();
-  nextRunEl.textContent = formatRelativeTime(status.nextRunTime);
-}, 30000);
-
-// ── 初始化 ──
-(async function init() {
-  // 1. 先获取历史日志并显示
+  if (!lastStatus) return;
   const status = await window.api.getStatus();
   updateStatus(status);
-  status.logs.forEach((l) => appendLog(l));
-  if (status.appVersion) {
-    appVersionEl.textContent = `v${status.appVersion}`;
-  }
+}, 30000);
 
-  // 2. 标记渲染进程已就绪，之后主进程的 addLog 会实时推送（不再重复）
+// ── Init ──
+(async function init() {
+  const status = await window.api.getStatus();
+  updateStatus(status);
+  (status.logs || []).forEach((l) => appendLog(l));
+
   window.api.rendererReady();
+  appendLog(`[${new Date().toLocaleString("zh-CN")}] 应用启动完成`);
 
-  appendLog("应用启动完成");
-
-  // 3. 检查登录状态
-  appendLog("正在检测登录状态...");
+  appendLog(`[${new Date().toLocaleString("zh-CN")}] 正在检测登录状态...`);
   const loggedIn = await window.api.checkLogin();
   setLoginStatus(loggedIn);
-
-  if (loggedIn) {
-    appendLog("已登录京东，可以点击「立即执行」或等待定时任务");
-  } else {
-    appendLog("未登录京东，请点击「去登录」按钮完成登录");
-  }
+  appendLog(
+    `[${new Date().toLocaleString("zh-CN")}] ${
+      loggedIn ? "已登录京东，可以点击「立即执行」或等待定时任务" : "未登录京东，请点击「去登录」完成登录"
+    }`
+  );
 })();

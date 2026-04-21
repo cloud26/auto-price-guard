@@ -521,10 +521,14 @@ ipcMain.on("install-update", () => {
 // ─── 窗口创建 ──────────────────────────────────────────────────
 function createMainWindow() {
   mainWindow = new BrowserWindow({
-    width: 560,
-    height: 700,
+    width: 656,
+    height: 784,
+    minWidth: 544,
+    minHeight: 656,
     title: "价保助手",
     resizable: true,
+    titleBarStyle: "hiddenInset",
+    backgroundColor: "#F5F5F7",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
