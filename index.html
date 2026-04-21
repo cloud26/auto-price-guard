@@ -8,6 +8,8 @@
     :root {
       --accent: #E03B3B;
       --accent-soft: rgba(224, 59, 59, 0.08);
+      --jd-color: #E03B3B;
+      --tb-color: #FF6A00;
 
       --chrome-bg: #ECECEE;
       --chrome-text: rgba(0, 0, 0, 0.65);
@@ -34,6 +36,8 @@
       --log-success: #9BE39B;
       --log-accent: #FFB45E;
       --log-danger: #FF9690;
+      --log-jd: #FF8E8E;
+      --log-tb: #FFB87A;
 
       --font-system: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Helvetica Neue", sans-serif;
       --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Helvetica Neue", sans-serif;
@@ -41,11 +45,7 @@
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    html, body {
-      height: 100%;
-    }
-
+    html, body { height: 100%; }
     body {
       font-family: var(--font-system);
       background: var(--bg);
@@ -56,12 +56,8 @@
       user-select: none;
       overflow: hidden;
     }
-
     .jd-num { font-variant-numeric: tabular-nums; }
-
-    button {
-      font-family: inherit;
-    }
+    button { font-family: inherit; }
 
     @keyframes jd-pulse {
       0% { transform: scale(1); opacity: .4; }
@@ -72,11 +68,11 @@
       50% { opacity: 1; }
     }
     @keyframes jd-sweep {
-      0%   { transform: translateX(-100%); }
+      0% { transform: translateX(-100%); }
       100% { transform: translateX(300%); }
     }
 
-    /* ── Title bar (macOS hiddenInset) ── */
+    /* ── Title bar ── */
     .titlebar {
       height: 44px;
       background: var(--chrome-bg);
@@ -116,73 +112,13 @@
     }
     .update-bar .btn-update:hover { background: rgba(255,255,255,0.15); }
 
-    /* ── Greeting row ── */
-    .greeting {
-      padding: 24px 32px 18px;
-      display: flex;
-      align-items: flex-start;
-      gap: 16px;
-      flex-shrink: 0;
-    }
-    .greeting-text { flex: 1; }
-    .greeting-hello {
-      font-size: 13px;
-      color: var(--text-muted);
-      margin-bottom: 4px;
-    }
-    .greeting-title {
-      font-size: 22px;
-      font-weight: 600;
-      letter-spacing: -0.3px;
-    }
-
-    .login-pill {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 12px;
-      border-radius: 999px;
-      background: var(--surface-2);
-      border: 1px solid var(--line);
-      font-size: 12.5px;
-      color: var(--text-muted);
-    }
-    .login-pill .sep {
-      color: var(--text-subtle);
-      margin: 0 2px;
-    }
-    .login-pill .action {
-      color: var(--text-subtle);
-      cursor: pointer;
-      background: none;
-      border: none;
-      padding: 0;
-      font-size: inherit;
-      font-family: inherit;
-    }
-    .login-pill .action:hover { color: var(--text); }
-    .login-pill .action.primary { color: var(--accent); }
-
     /* Status dot */
-    .dot {
-      position: relative;
-      width: 8px;
-      height: 8px;
-      display: inline-block;
-      flex-shrink: 0;
-    }
-    .dot .inner {
-      position: absolute;
-      inset: 0;
-      border-radius: 50%;
-      background: var(--text-subtle);
-    }
+    .dot { position: relative; width: 8px; height: 8px; display: inline-block; flex-shrink: 0; }
+    .dot .inner { position: absolute; inset: 0; border-radius: 50%; background: var(--text-subtle); }
     .dot .pulse {
       display: none;
-      position: absolute;
-      inset: -3px;
-      border-radius: 50%;
-      opacity: .25;
+      position: absolute; inset: -3px;
+      border-radius: 50%; opacity: .25;
       animation: jd-pulse 1.6s ease-out infinite;
     }
     .dot.pulsing .pulse { display: block; }
@@ -192,13 +128,13 @@
     .dot.accent  .inner, .dot.accent  .pulse { background: var(--accent); }
     .dot.muted   .inner, .dot.muted   .pulse { background: var(--text-subtle); }
 
-    /* ── Hero savings card ── */
-    .hero-wrap { padding: 0 32px; flex-shrink: 0; }
+    /* ── Hero: total savings ── */
+    .hero-wrap { padding: 22px 32px 16px; flex-shrink: 0; }
     .hero {
       position: relative;
       background: var(--surface);
       border-radius: 16px;
-      padding: 28px 28px 24px;
+      padding: 24px 28px 22px;
       border: 1px solid var(--line);
       overflow: hidden;
     }
@@ -215,14 +151,14 @@
       color: var(--text-muted);
       letter-spacing: 0.3px;
       text-transform: uppercase;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       position: relative;
     }
     .hero-amount {
       font-family: var(--font-display);
-      font-size: 64px;
+      font-size: 52px;
       font-weight: 300;
-      letter-spacing: -2px;
+      letter-spacing: -1.5px;
       line-height: 1;
       color: var(--accent);
       display: flex;
@@ -230,85 +166,161 @@
       gap: 4px;
       position: relative;
     }
-    .hero-amount .sym {
-      font-size: 36px;
-      font-weight: 400;
-      opacity: 0.8;
-    }
-    .hero-amount .dec {
-      font-size: 32px;
-      font-weight: 300;
-      opacity: 0.55;
-    }
+    .hero-amount .sym { font-size: 30px; font-weight: 400; opacity: 0.8; }
+    .hero-amount .dec { font-size: 26px; font-weight: 300; opacity: 0.55; }
     .hero-meta {
-      margin-top: 14px;
-      display: flex;
-      gap: 28px;
+      margin-top: 10px;
       font-size: 13px;
       color: var(--text-muted);
       position: relative;
     }
-    .hero-meta strong {
-      color: var(--text);
-      font-weight: 500;
-    }
+    .hero-meta strong { color: var(--text); font-weight: 500; }
 
-    /* ── Run state card ── */
-    .run-wrap { padding: 16px 32px 0; flex-shrink: 0; }
-    .run {
+    /* ── Platform cards ── */
+    .platform-wrap { padding: 8px 32px 0; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0; }
+    .platform {
       background: var(--surface);
-      border-radius: 16px;
+      border-radius: 14px;
       border: 1px solid var(--line);
-      padding: 20px;
+      padding: 16px 18px;
     }
-    .run-head {
+    .platform-head {
       display: flex;
       align-items: center;
-      margin-bottom: 16px;
+      gap: 10px;
+      margin-bottom: 12px;
     }
-    .section-label {
-      font-size: 12px;
-      color: var(--text-muted);
-      letter-spacing: 0.3px;
-      text-transform: uppercase;
-      flex: 1;
+    .platform-name {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: -0.1px;
     }
-    .run-state {
+    .platform-name.jd { color: var(--jd-color); }
+    .platform-name.tb { color: var(--tb-color); }
+    .login-pill {
       display: flex;
       align-items: center;
       gap: 6px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      border: 1px solid var(--line);
       font-size: 12px;
       color: var(--text-muted);
+      margin-left: auto;
     }
-    .run-state.active { color: var(--accent); }
-    .run-grid {
+    .login-pill.logged-in {
+      background: rgba(47, 168, 92, 0.08);
+      border-color: rgba(47, 168, 92, 0.2);
+      color: var(--success);
+    }
+    .login-pill .pill-dot {
+      display: none;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--success);
+      flex-shrink: 0;
+    }
+    .login-pill.logged-in .pill-dot { display: block; }
+    .login-pill .action {
+      color: var(--text-subtle);
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: inherit;
+      font-family: inherit;
+      margin-left: 2px;
+    }
+    .login-pill .action::before {
+      content: '·';
+      margin-right: 4px;
+      color: inherit;
+      opacity: 0.5;
+    }
+    .login-pill .action:hover { color: var(--text); }
+    .login-pill .action.primary { color: var(--accent); }
+
+    .platform-stats {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
-      gap: 20px;
+      gap: 16px;
+      margin-bottom: 14px;
     }
-    .stat-label {
-      font-size: 11.5px;
-      color: var(--text-muted);
-      margin-bottom: 4px;
-    }
+    .stat-label { font-size: 11px; color: var(--text-muted); margin-bottom: 3px; }
     .stat-value {
-      font-size: 16px;
+      font-size: 14px;
       font-weight: 500;
-      letter-spacing: -0.2px;
+      letter-spacing: -0.1px;
       color: var(--text);
     }
-    .stat-value.success { color: var(--success); }
-    .stat-value.danger  { color: var(--danger); }
     .stat-value.pending { color: var(--text-muted); font-weight: 400; }
-    .stat-meta {
-      font-size: 11.5px;
+    .stat-value.success { color: var(--success); }
+    .stat-value.danger { color: var(--danger); }
+    .stat-meta { font-size: 11px; color: var(--text-subtle); margin-top: 2px; }
+
+    .platform-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .interval {
+      flex: 1;
+      background: var(--surface-2);
+      border-radius: 10px;
+      border: 1px solid var(--line);
+      padding: 8px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12.5px;
+      color: var(--text-muted);
+    }
+    .interval select {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-size: 12.5px;
+      font-family: inherit;
+      cursor: pointer;
+      outline: none;
+      margin-left: auto;
+      text-align: right;
+    }
+    .btn-run {
+      padding: 0 18px;
+      height: 34px;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 12.5px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: opacity 0.15s, transform 0.05s;
+      flex-shrink: 0;
+    }
+    .btn-run:hover:not(:disabled) { opacity: 0.9; }
+    .btn-run:active:not(:disabled) { transform: scale(0.98); }
+    .btn-run:disabled {
+      background: var(--surface);
       color: var(--text-subtle);
-      margin-top: 2px;
+      border: 1px solid var(--line-strong);
+      cursor: not-allowed;
+    }
+    .btn-run.loading {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--line-strong);
     }
 
     .progress-strip {
       display: none;
-      margin-top: 16px;
+      margin-top: 10px;
       height: 3px;
       background: var(--surface-inset);
       border-radius: 2px;
@@ -325,77 +337,9 @@
       animation: jd-sweep 1.8s linear infinite;
     }
 
-    /* ── Interval + run button ── */
-    .actions-wrap {
-      padding: 16px 32px 0;
-      display: flex;
-      gap: 12px;
-      flex-shrink: 0;
-    }
-    .interval {
-      flex: 1;
-      background: var(--surface);
-      border-radius: 14px;
-      border: 1px solid var(--line);
-      padding: 14px 16px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-    }
-    .interval-label {
-      font-size: 13.5px;
-      color: var(--text);
-      flex: 1;
-    }
-    .interval select {
-      background: transparent;
-      border: none;
-      color: var(--text);
-      font-size: 13.5px;
-      font-family: inherit;
-      cursor: pointer;
-      outline: none;
-      text-align: right;
-      padding-right: 4px;
-    }
-    .btn-run {
-      padding: 0 24px;
-      height: 46px;
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      border-radius: 14px;
-      font-size: 13.5px;
-      font-weight: 500;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      transition: opacity 0.15s, transform 0.05s;
-    }
-    .btn-run:hover:not(:disabled) { opacity: 0.9; }
-    .btn-run:active:not(:disabled) { transform: scale(0.98); }
-    .btn-run:disabled {
-      background: var(--surface);
-      color: var(--text-subtle);
-      border: 1px solid var(--line-strong);
-      cursor: not-allowed;
-    }
-    .btn-run.loading {
-      background: var(--surface);
-      color: var(--text);
-      border: 1px solid var(--line-strong);
-    }
-    .btn-run .stop-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 2px;
-      background: currentColor;
-    }
-
     /* ── Log ── */
     .log-wrap {
-      padding: 16px 32px 20px;
+      padding: 16px 32px 12px;
       flex: 1;
       min-height: 0;
       display: flex;
@@ -407,18 +351,22 @@
       margin-bottom: 10px;
       gap: 10px;
     }
-    .log-head .count {
+    .section-label {
       font-size: 12px;
-      color: var(--text-subtle);
+      color: var(--text-muted);
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+      flex: 1;
     }
+    .log-head .count { font-size: 12px; color: var(--text-subtle); }
     .log-box {
       flex: 1;
       background: var(--log-bg);
       border-radius: 12px;
-      padding: 14px 16px;
+      padding: 12px 16px;
       font-family: var(--font-mono);
       font-size: 12px;
-      line-height: 1.7;
+      line-height: 1.65;
       color: var(--log-text);
       overflow-y: auto;
       user-select: text;
@@ -434,6 +382,8 @@
       word-break: break-all;
     }
     .log-line .ts { color: rgba(181,181,186,.35); }
+    .log-line .tag-jd { color: var(--log-jd); }
+    .log-line .tag-tb { color: var(--log-tb); }
     .log-line.success { color: var(--log-success); }
     .log-line.accent  { color: var(--log-accent); }
     .log-line.danger  { color: var(--log-danger); }
@@ -467,21 +417,7 @@
     <button class="btn-update" id="updateBtn">下载更新</button>
   </div>
 
-  <!-- Greeting + login pill -->
-  <div class="greeting">
-    <div class="greeting-text">
-      <div class="greeting-hello" id="greetingHello">你好</div>
-      <div class="greeting-title">价保助手</div>
-    </div>
-    <div class="login-pill" id="loginPill">
-      <span class="dot muted" id="loginDot"><span class="pulse"></span><span class="inner"></span></span>
-      <span id="loginText">检测登录状态...</span>
-      <span class="sep" id="loginSep" style="display:none">·</span>
-      <button class="action" id="loginAction" style="display:none">登录</button>
-    </div>
-  </div>
-
-  <!-- Hero savings -->
+  <!-- Hero: total savings -->
   <div class="hero-wrap">
     <div class="hero">
       <div class="hero-label">累计省钱</div>
@@ -489,67 +425,112 @@
         <span class="sym">¥</span><span id="heroInt">0</span><span class="dec" id="heroDec">.00</span>
       </div>
       <div class="hero-meta">
-        <div><strong class="jd-num" id="heroCount">0</strong> 件商品成功退款</div>
+        <strong class="jd-num" id="heroCount">0</strong> 件商品成功退款
       </div>
     </div>
   </div>
 
-  <!-- Run state -->
-  <div class="run-wrap">
-    <div class="run">
-      <div class="run-head">
-        <div class="section-label">运行状态</div>
-        <div class="run-state" id="runState">
-          <span class="dot muted" id="runStateDot"><span class="pulse"></span><span class="inner"></span></span>
-          <span id="runStateText">未启动</span>
-        </div>
+  <!-- Platforms -->
+  <div class="platform-wrap">
+    <!-- JD -->
+    <div class="platform" id="card-jd">
+      <div class="platform-head">
+        <span class="dot muted" id="jd-dot"><span class="pulse"></span><span class="inner"></span></span>
+        <span class="platform-name jd">京东</span>
+        <span class="login-pill" id="jd-loginPill">
+          <span class="pill-dot"></span>
+          <span id="jd-loginText">检测中…</span>
+          <button class="action" id="jd-loginAction" style="display:none"></button>
+        </span>
       </div>
-      <div class="run-grid">
+      <div class="platform-stats">
+        <div>
+          <div class="stat-label">累计</div>
+          <div class="stat-value jd-num" id="jd-saved">¥0.00</div>
+          <div class="stat-meta jd-num" id="jd-savedMeta">0 件</div>
+        </div>
         <div>
           <div class="stat-label">上次运行</div>
-          <div class="stat-value pending jd-num" id="lastRun">--</div>
-          <div class="stat-meta" id="lastRunMeta"></div>
-        </div>
-        <div>
-          <div class="stat-label">本次结果</div>
-          <div class="stat-value pending" id="lastResult">--</div>
-          <div class="stat-meta" id="lastResultMeta"></div>
+          <div class="stat-value pending" id="jd-lastRun">--</div>
+          <div class="stat-meta" id="jd-lastResult"></div>
         </div>
         <div>
           <div class="stat-label">下次运行</div>
-          <div class="stat-value pending" id="nextRun">--</div>
-          <div class="stat-meta jd-num" id="nextRunMeta"></div>
+          <div class="stat-value pending" id="jd-nextRun">--</div>
+          <div class="stat-meta" id="jd-nextRunMeta"></div>
         </div>
       </div>
-      <div class="progress-strip" id="progressStrip"></div>
+      <div class="platform-actions">
+        <div class="interval">
+          <span>每</span>
+          <select id="jd-intervalSelect">
+            <option value="0.5">30 分钟</option>
+            <option value="1">1 小时</option>
+            <option value="2" selected>2 小时</option>
+            <option value="4">4 小时</option>
+            <option value="6">6 小时</option>
+            <option value="8">8 小时</option>
+            <option value="12">12 小时</option>
+            <option value="24">24 小时</option>
+          </select>
+          <span>执行一次</span>
+        </div>
+        <button class="btn-run" id="jd-runBtn">
+          <span id="jd-runBtnText">立即执行</span>
+        </button>
+      </div>
+      <div class="progress-strip" id="jd-progress"></div>
     </div>
-  </div>
 
-  <!-- Interval + run -->
-  <div class="actions-wrap">
-    <div class="interval">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" style="color: var(--text-muted)">
-        <circle cx="8" cy="8" r="6.5"/>
-        <path d="M8 4v4l2.5 1.5"/>
-      </svg>
-      <div class="interval-label">执行间隔</div>
-      <select id="intervalSelect">
-        <option value="0.5">每 30 分钟</option>
-        <option value="1">每 1 小时</option>
-        <option value="2" selected>每 2 小时</option>
-        <option value="4">每 4 小时</option>
-        <option value="6">每 6 小时</option>
-        <option value="8">每 8 小时</option>
-        <option value="12">每 12 小时</option>
-        <option value="24">每 24 小时</option>
-      </select>
+    <!-- TB -->
+    <div class="platform" id="card-tb">
+      <div class="platform-head">
+        <span class="dot muted" id="tb-dot"><span class="pulse"></span><span class="inner"></span></span>
+        <span class="platform-name tb">淘宝</span>
+        <span class="login-pill" id="tb-loginPill">
+          <span class="pill-dot"></span>
+          <span id="tb-loginText">检测中…</span>
+          <button class="action" id="tb-loginAction" style="display:none"></button>
+        </span>
+      </div>
+      <div class="platform-stats">
+        <div>
+          <div class="stat-label">累计</div>
+          <div class="stat-value jd-num" id="tb-saved">¥0.00</div>
+          <div class="stat-meta jd-num" id="tb-savedMeta">0 件</div>
+        </div>
+        <div>
+          <div class="stat-label">上次运行</div>
+          <div class="stat-value pending" id="tb-lastRun">--</div>
+          <div class="stat-meta" id="tb-lastResult"></div>
+        </div>
+        <div>
+          <div class="stat-label">下次运行</div>
+          <div class="stat-value pending" id="tb-nextRun">--</div>
+          <div class="stat-meta" id="tb-nextRunMeta"></div>
+        </div>
+      </div>
+      <div class="platform-actions">
+        <div class="interval">
+          <span>每</span>
+          <select id="tb-intervalSelect">
+            <option value="0.5">30 分钟</option>
+            <option value="1">1 小时</option>
+            <option value="2" selected>2 小时</option>
+            <option value="4">4 小时</option>
+            <option value="6">6 小时</option>
+            <option value="8">8 小时</option>
+            <option value="12">12 小时</option>
+            <option value="24">24 小时</option>
+          </select>
+          <span>执行一次</span>
+        </div>
+        <button class="btn-run" id="tb-runBtn">
+          <span id="tb-runBtnText">立即执行</span>
+        </button>
+      </div>
+      <div class="progress-strip" id="tb-progress"></div>
     </div>
-    <button class="btn-run" id="runBtn">
-      <svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor">
-        <path d="M1 1.2v9.6c0 .7.77 1.12 1.36.74l7.5-4.8a.88.88 0 000-1.48L2.36.46A.88.88 0 001 1.2z"/>
-      </svg>
-      <span id="runBtnText">立即执行</span>
-    </button>
   </div>
 
   <!-- Log -->
@@ -563,7 +544,6 @@
     </div>
   </div>
 
-  <!-- Footer -->
   <div class="footer">关闭窗口后将在菜单栏继续运行 · <span id="appVersion"></span></div>
 
   <script src="renderer.js"></script>
