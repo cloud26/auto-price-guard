@@ -239,45 +239,8 @@ function formatCooling(ms) {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// JD 专属：fetch/XHR hook + 一键价保解析
+// JD 专属：一键价保解析
 // ═══════════════════════════════════════════════════════════════
-const JD_INTERCEPT_SCRIPT = `
-(function() {
-  if (window.__jdApiHooked) return;
-  window.__jdApiHooked = true;
-  window.__jdApiResponses = [];
-  const origFetch = window.fetch;
-  window.fetch = async function(...args) {
-    const resp = await origFetch.apply(this, args);
-    const url = (typeof args[0] === 'string') ? args[0] : (args[0]?.url || '');
-    if (url.includes('api.m.jd.com') || url.includes('api.jd.com')) {
-      try {
-        const clone = resp.clone();
-        const text = await clone.text();
-        window.__jdApiResponses.push({ url, body: text, time: Date.now() });
-      } catch(e) {}
-    }
-    return resp;
-  };
-  const origOpen = XMLHttpRequest.prototype.open;
-  const origSend = XMLHttpRequest.prototype.send;
-  XMLHttpRequest.prototype.open = function(method, url, ...rest) {
-    this.__url = url;
-    return origOpen.call(this, method, url, ...rest);
-  };
-  XMLHttpRequest.prototype.send = function(...args) {
-    this.addEventListener('load', function() {
-      const url = this.__url || '';
-      if (url.includes('api.m.jd.com') || url.includes('api.jd.com')) {
-        try {
-          window.__jdApiResponses.push({ url, body: this.responseText, time: Date.now() });
-        } catch(e) {}
-      }
-    });
-    return origSend.apply(this, args);
-  };
-})();
-`;
 
 function extractJdResults(responses) {
   let totalAmount = 0;
@@ -329,7 +292,22 @@ function extractJdResults(responses) {
     if (root.responseMessage && amt === 0) details.push(root.responseMessage);
   }
 
-  return { totalAmount, successCount, details, hasApi: priceResponses.length > 0 };
+  // 从首个统计 API 提取历史累计
+  let historyTotal = 0;
+  let historyCount = 0;
+  for (const resp of responses) {
+    let data;
+    try { data = JSON.parse(resp.body); } catch { continue; }
+    if (data?.code === 0 && data.data?.totalPriceproSuccAmount != null) {
+      historyTotal = parseFloat(data.data.totalPriceproSuccAmount) || 0;
+      historyCount = parseInt(data.data.totalCount) || 0;
+      break;
+    }
+  }
+
+  if (DEBUG) addLog("jd", `[DEBUG] 解析结果: amount=${totalAmount}, history=${historyTotal}/${historyCount}`);
+
+  return { totalAmount, successCount, details, hasApi: priceResponses.length > 0, historyTotal, historyCount };
 }
 
 async function runJd(manual) {
@@ -340,11 +318,15 @@ async function runJd(manual) {
     width: 375,
     height: 812,
     show: DEBUG,
-    webPreferences: { partition: cfg.partition },
+    webPreferences: {
+      partition: cfg.partition,
+      preload: path.join(__dirname, "jd-preload.js"),
+      contextIsolation: false,
+      sandbox: false,
+      nodeIntegration: false,
+    },
   });
-  win.webContents.on("dom-ready", () => {
-    win.webContents.executeJavaScript(JD_INTERCEPT_SCRIPT).catch(() => {});
-  });
+  if (DEBUG) win.webContents.openDevTools({ mode: "right" });
 
   let clicked = null;
   try {
@@ -358,7 +340,6 @@ async function runJd(manual) {
     });
     win.loadURL(cfg.targetUrl, { userAgent: MOBILE_UA });
     await loaded;
-    await win.webContents.executeJavaScript(JD_INTERCEPT_SCRIPT);
     await delay(5000);
 
     clicked = await win.webContents.executeJavaScript(`
@@ -407,6 +388,14 @@ async function runJd(manual) {
       `JSON.stringify(window.__jdApiResponses || [])`
     );
     const responses = JSON.parse(raw);
+
+    if (DEBUG) {
+      addLog("jd", `[DEBUG] 共捕获 ${responses.length} 个 API 响应`);
+      for (const r of responses) {
+        addLog("jd", `[DEBUG] ${r.url.slice(0, 80)}: ${r.body.slice(0, 500)}`);
+      }
+    }
+
     const result = extractJdResults(responses);
     result.details.forEach((d) => addLog("jd", `  ${d}`));
 
@@ -420,13 +409,16 @@ async function runJd(manual) {
         body: `京东价保成功！退款 ¥${result.totalAmount.toFixed(2)}`,
       }).show();
       store.jd.lastRunResult = `成功 ¥${result.totalAmount.toFixed(2)}`;
-      store.jd.totalSaved += result.totalAmount;
-      store.jd.totalSuccessCount += result.successCount;
     } else if (result.hasApi) {
       addLog("jd", "价保已申请，本次无退款");
       store.jd.lastRunResult = clicked ? "已申请(无退款)" : "无可申请订单";
     } else {
       store.jd.lastRunResult = clicked ? "已申请(无API)" : "无可申请订单";
+    }
+    // 用平台返回的历史累计数据
+    if (result.historyTotal > 0) {
+      store.jd.totalSaved = result.historyTotal;
+      store.jd.totalSuccessCount = result.historyCount;
     }
     store.jd.lastRunTime = new Date().toISOString();
     saveStore();
@@ -488,17 +480,23 @@ function extractTbResults(responses) {
   }
 
   const base = findByApiSuffix(responses, "baseinfo.get");
+  let historyTotal = 0;
+  let historyCount = 0;
   if (base && base.data) {
     const model = (base.data.data && base.data.data.model) || base.data.model;
     if (DEBUG) addLog("tb", `[DEBUG] baseinfo model: ${JSON.stringify(model)}`);
-    if (model && model.coolingTime) {
-      coolingTime = parseInt(model.coolingTime) || 0;
+    if (model) {
+      if (model.coolingTime) {
+        coolingTime = parseInt(model.coolingTime) || 0;
+      }
+      historyTotal = parseFloat(model.totalRefundFee) || 0;
+      historyCount = parseInt(model.sucCount) || 0;
     }
   }
 
-  if (DEBUG) addLog("tb", `[DEBUG] 解析结果: amount=${totalAmount}, count=${successCount}, coolingTime=${coolingTime}ms (${formatCooling(coolingTime)})`);
+  if (DEBUG) addLog("tb", `[DEBUG] 解析结果: amount=${totalAmount}, count=${successCount}, coolingTime=${coolingTime}ms (${formatCooling(coolingTime)}), history=${historyTotal}/${historyCount}`);
 
-  return { totalAmount, successCount, details, coolingTime };
+  return { totalAmount, successCount, details, coolingTime, historyTotal, historyCount };
 }
 
 async function runTb(manual) {
@@ -642,11 +640,14 @@ async function runTb(manual) {
         body: `淘宝价保成功！退款 ¥${result.totalAmount.toFixed(2)}`,
       }).show();
       store.tb.lastRunResult = `成功 ¥${result.totalAmount.toFixed(2)}`;
-      store.tb.totalSaved += result.totalAmount;
-      store.tb.totalSuccessCount += result.successCount;
     } else {
       addLog("tb", "本次无退款");
       store.tb.lastRunResult = clicked ? "已申请(无退款)" : "无可申请订单";
+    }
+    // 用平台返回的历史累计数据
+    if (result.historyTotal > 0) {
+      store.tb.totalSaved = result.historyTotal;
+      store.tb.totalSuccessCount = result.historyCount;
     }
     store.tb.lastRunTime = new Date().toISOString();
     saveStore();

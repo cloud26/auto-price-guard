@@ -43,6 +43,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "jd-preload.js",
       "tb-preload.js",
       "index.html",
       "renderer.js"
