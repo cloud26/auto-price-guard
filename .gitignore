@@ -5,3 +5,4 @@ screenshot*
 !screenshot.png
 .env
 .env.local
+.claude/settings.local.json
