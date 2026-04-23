@@ -9,36 +9,17 @@ const updateText = $("updateText");
 const updateBtn = $("updateBtn");
 const appVersionEl = $("appVersion");
 const logBox = $("logBox");
+const accountListEl = $("accountList");
 
-const PLATFORMS = ["jd", "tb"];
 const PLATFORM_NAMES = { jd: "京东", tb: "淘宝" };
+const PLATFORM_COLORS = { jd: "jd", tb: "tb" };
 
-// Per-platform DOM refs
-const ui = {};
-for (const p of PLATFORMS) {
-  ui[p] = {
-    dot: $(`${p}-dot`),
-    loginPill: $(`${p}-loginPill`),
-    loginText: $(`${p}-loginText`),
-    loginAction: $(`${p}-loginAction`),
-    saved: $(`${p}-saved`),
-    savedMeta: $(`${p}-savedMeta`),
-    lastRun: $(`${p}-lastRun`),
-    lastResult: $(`${p}-lastResult`),
-    nextRun: $(`${p}-nextRun`),
-    nextRunMeta: $(`${p}-nextRunMeta`),
-    runBtn: $(`${p}-runBtn`),
-    runBtnText: $(`${p}-runBtnText`),
-    progress: $(`${p}-progress`),
-  };
-}
-
-const jdIntervalSelect = $("jd-intervalSelect");
-const tbIntervalSelect = $("tb-intervalSelect");
+// Per-account DOM refs (Map<accountId, {dot, loginPill, ...}>)
+const ui = new Map();
+let accounts = [];
 
 const state = {
-  jd: { loggedIn: false },
-  tb: { loggedIn: false },
+  loginStatus: new Map(), // accountId → boolean
   last: null,
   updateState: "idle",
 };
@@ -80,6 +61,136 @@ function setDot(el, kind, pulsing) {
   el.className = `dot ${kind}${pulsing ? " pulsing" : ""}`;
 }
 
+// ── Dynamic card creation ──
+function createIntervalSelect(accountId, currentHours) {
+  const options = [
+    { value: "0.5", label: "30 分钟" },
+    { value: "1", label: "1 小时" },
+    { value: "2", label: "2 小时" },
+    { value: "4", label: "4 小时" },
+    { value: "6", label: "6 小时" },
+    { value: "8", label: "8 小时" },
+    { value: "12", label: "12 小时" },
+    { value: "24", label: "24 小时" },
+  ];
+  const select = document.createElement("select");
+  for (const opt of options) {
+    const el = document.createElement("option");
+    el.value = opt.value;
+    el.textContent = opt.label;
+    if (String(currentHours) === opt.value) el.selected = true;
+    select.appendChild(el);
+  }
+  select.onchange = () =>
+    window.api.updateConfig(accountId, { hours: parseFloat(select.value) });
+  return select;
+}
+
+function createAccountCard(account) {
+  const type = account.type;
+  const colorClass = PLATFORM_COLORS[type] || "jd";
+  const platformName = PLATFORM_NAMES[type] || type;
+
+  const card = document.createElement("div");
+  card.className = "platform";
+  card.dataset.accountId = account.id;
+
+  card.innerHTML = `
+    <div class="platform-head">
+      <span class="dot muted"><span class="pulse"></span><span class="inner"></span></span>
+      <span class="platform-name ${colorClass}">${platformName}</span>
+      <span class="platform-nickname"></span>
+      <span class="login-pill">
+        <span class="pill-dot"></span>
+        <span class="login-text">检测中…</span>
+        <button class="action" style="display:none"></button>
+      </span>
+      <button class="btn-remove" title="删除账号">×</button>
+    </div>
+    <div class="platform-stats">
+      <div>
+        <div class="stat-label">累计</div>
+        <div class="stat-value jd-num saved">¥0.00</div>
+        <div class="stat-meta jd-num saved-meta">0 件</div>
+      </div>
+      <div>
+        <div class="stat-label">上次运行</div>
+        <div class="stat-value pending last-run">--</div>
+        <div class="stat-meta last-result"></div>
+      </div>
+      <div>
+        <div class="stat-label">下次运行</div>
+        <div class="stat-value pending next-run">--</div>
+        <div class="stat-meta next-run-meta"></div>
+      </div>
+    </div>
+    <div class="platform-actions">
+      <div class="interval">
+        <span>每</span>
+        <span class="interval-select-wrap"></span>
+        <span>执行一次</span>
+      </div>
+      <button class="btn-run">
+        <span class="run-btn-text">立即执行</span>
+      </button>
+    </div>
+    <div class="progress-strip"></div>
+  `;
+
+  // Insert interval select
+  const selectWrap = card.querySelector(".interval-select-wrap");
+  const intervalSelect = createIntervalSelect(
+    account.id,
+    account.intervalHours || 2
+  );
+  selectWrap.appendChild(intervalSelect);
+
+  // Gather refs
+  const refs = {
+    card,
+    dot: card.querySelector(".dot"),
+    platformNickname: card.querySelector(".platform-nickname"),
+    loginPill: card.querySelector(".login-pill"),
+    loginText: card.querySelector(".login-text"),
+    loginAction: card.querySelector(".login-pill .action"),
+    saved: card.querySelector(".saved"),
+    savedMeta: card.querySelector(".saved-meta"),
+    lastRun: card.querySelector(".last-run"),
+    lastResult: card.querySelector(".last-result"),
+    nextRun: card.querySelector(".next-run"),
+    nextRunMeta: card.querySelector(".next-run-meta"),
+    runBtn: card.querySelector(".btn-run"),
+    runBtnText: card.querySelector(".run-btn-text"),
+    progress: card.querySelector(".progress-strip"),
+    intervalSelect,
+    removeBtn: card.querySelector(".btn-remove"),
+  };
+
+  // Event bindings
+  refs.runBtn.onclick = () => window.api.runNow(account.id);
+  refs.removeBtn.onclick = () => {
+    if (confirm(`确定删除此${platformName}账号吗？`)) {
+      window.api.removeAccount(account.id);
+    }
+  };
+
+  accountListEl.appendChild(card);
+  ui.set(account.id, refs);
+  state.loginStatus.set(account.id, false);
+
+  return refs;
+}
+
+function removeAccountCard(accountId) {
+  const refs = ui.get(accountId);
+  if (refs) {
+    refs.card.remove();
+    ui.delete(accountId);
+    state.loginStatus.delete(accountId);
+  }
+}
+
+// ── Render ──
 function renderHero(totals) {
   const amount = totals?.saved || 0;
   const [intPart, decPart] = amount.toFixed(2).split(".");
@@ -88,98 +199,130 @@ function renderHero(totals) {
   heroCountEl.textContent = totals?.count || 0;
 }
 
-function renderPlatform(p, data) {
-  const els = ui[p];
+function renderAccount(accountId, data) {
+  const refs = ui.get(accountId);
+  if (!refs) return;
   const running = !!data.isRunning;
   const scheduled = !!data.schedulerRunning;
-  const loggedIn = state[p].loggedIn;
+  const loggedIn = state.loginStatus.get(accountId) || false;
+
+  // Nickname
+  refs.platformNickname.textContent = data.nickname ? `· ${data.nickname}` : "";
 
   // Dot status
-  if (running) setDot(els.dot, "accent", true);
-  else if (loggedIn && scheduled) setDot(els.dot, "success", false);
-  else if (loggedIn) setDot(els.dot, "warning", false);
-  else setDot(els.dot, "muted", false);
+  if (running) setDot(refs.dot, "accent", true);
+  else if (loggedIn && scheduled) setDot(refs.dot, "success", false);
+  else if (loggedIn) setDot(refs.dot, "warning", false);
+  else setDot(refs.dot, "muted", false);
 
   // Progress strip
-  els.progress.classList.toggle("show", running);
+  refs.progress.classList.toggle("show", running);
 
   // Saved
-  els.saved.textContent = `¥${(data.totalSaved || 0).toFixed(2)}`;
-  els.savedMeta.textContent = `${data.totalSuccessCount || 0} 件`;
+  refs.saved.textContent = `¥${(data.totalSaved || 0).toFixed(2)}`;
+  refs.savedMeta.textContent = `${data.totalSuccessCount || 0} 件`;
 
   // Last run
   const lastStr = formatDateTime(data.lastRunTime);
-  els.lastRun.textContent = lastStr || "--";
-  els.lastRun.classList.toggle("pending", !lastStr);
+  refs.lastRun.textContent = lastStr || "--";
+  refs.lastRun.classList.toggle("pending", !lastStr);
   if (data.lastRunResult) {
     const raw = data.lastRunResult;
     const ok = raw.startsWith("成功");
     const err = raw.startsWith("出错");
-    els.lastResult.textContent = ok
+    refs.lastResult.textContent = ok
       ? raw.replace(/^成功\s*/, "")
       : raw.length > 14
       ? raw.slice(0, 14) + "…"
       : raw;
-    els.lastResult.className = "stat-meta";
-    if (ok) els.lastResult.style.color = "var(--success)";
-    else if (err) els.lastResult.style.color = "var(--danger)";
-    else els.lastResult.style.color = "";
+    refs.lastResult.className = "stat-meta";
+    if (ok) refs.lastResult.style.color = "var(--success)";
+    else if (err) refs.lastResult.style.color = "var(--danger)";
+    else refs.lastResult.style.color = "";
   } else {
-    els.lastResult.textContent = data.lastRunTime ? formatPast(data.lastRunTime) : "";
-    els.lastResult.style.color = "";
+    refs.lastResult.textContent = data.lastRunTime
+      ? formatPast(data.lastRunTime)
+      : "";
+    refs.lastResult.style.color = "";
   }
 
   // Next run
   const nextRel = formatRelative(data.nextRunTime);
-  els.nextRun.textContent = nextRel || "--";
-  els.nextRun.classList.toggle("pending", !nextRel);
-  els.nextRunMeta.textContent = data.nextRunTime ? formatDateTime(data.nextRunTime) : "";
+  refs.nextRun.textContent = nextRel || "--";
+  refs.nextRun.classList.toggle("pending", !nextRel);
+  refs.nextRunMeta.textContent = data.nextRunTime
+    ? formatDateTime(data.nextRunTime)
+    : "";
 
   // Run button
   if (running) {
-    els.runBtn.disabled = true;
-    els.runBtn.classList.add("loading");
-    els.runBtnText.textContent = "运行中…";
+    refs.runBtn.disabled = true;
+    refs.runBtn.classList.add("loading");
+    refs.runBtnText.textContent = "运行中…";
   } else {
-    els.runBtn.disabled = !loggedIn;
-    els.runBtn.classList.remove("loading");
-    els.runBtnText.textContent = "立即执行";
+    refs.runBtn.disabled = !loggedIn;
+    refs.runBtn.classList.remove("loading");
+    refs.runBtnText.textContent = "立即执行";
+  }
+
+  // Interval select
+  if (data.intervalHours != null) {
+    refs.intervalSelect.value = String(data.intervalHours);
   }
 }
 
 function updateStatus(status) {
   state.last = status;
   renderHero(status.totals);
-  renderPlatform("jd", status.jd || {});
-  renderPlatform("tb", status.tb || {});
-  if (status.jd?.intervalHours != null) {
-    jdIntervalSelect.value = String(status.jd.intervalHours);
+
+  const newIds = new Set(status.accounts.map((a) => a.id));
+  const oldIds = new Set(accounts.map((a) => a.id));
+
+  // Remove deleted accounts
+  for (const id of oldIds) {
+    if (!newIds.has(id)) removeAccountCard(id);
   }
-  if (status.tb?.intervalHours != null) {
-    tbIntervalSelect.value = String(status.tb.intervalHours);
+
+  // Add new accounts
+  for (const a of status.accounts) {
+    if (!oldIds.has(a.id)) createAccountCard(a);
   }
+
+  // Update all
+  accounts = status.accounts;
+  for (const a of accounts) {
+    renderAccount(a.id, a);
+  }
+
   if (status.appVersion) appVersionEl.textContent = `v${status.appVersion}`;
 }
 
-function setLoginStatus(platform, loggedIn) {
-  state[platform].loggedIn = loggedIn;
-  const els = ui[platform];
-  const name = PLATFORM_NAMES[platform];
-  els.loginPill.classList.toggle("logged-in", loggedIn);
+function setLoginStatus(accountId, loggedIn) {
+  state.loginStatus.set(accountId, loggedIn);
+  const refs = ui.get(accountId);
+  if (!refs) return;
+  const account = accounts.find((a) => a.id === accountId);
+  const name = account
+    ? PLATFORM_NAMES[account.type] || account.type
+    : "";
+
+  refs.loginPill.classList.toggle("logged-in", loggedIn);
   if (loggedIn) {
-    els.loginText.textContent = `已登录${name}`;
-    els.loginAction.style.display = "";
-    els.loginAction.textContent = "退出";
-    els.loginAction.classList.remove("primary");
-    els.loginAction.onclick = () => window.api.logout(platform);
+    refs.loginText.textContent = `已登录`;
+    refs.loginAction.style.display = "";
+    refs.loginAction.textContent = "退出";
+    refs.loginAction.classList.remove("primary");
+    refs.loginAction.onclick = () => window.api.logout(accountId);
   } else {
-    els.loginText.textContent = "未登录";
-    els.loginAction.style.display = "";
-    els.loginAction.textContent = "去登录";
-    els.loginAction.classList.add("primary");
-    els.loginAction.onclick = () => window.api.openLogin(platform);
+    refs.loginText.textContent = "未登录";
+    refs.loginAction.style.display = "";
+    refs.loginAction.textContent = "去登录";
+    refs.loginAction.classList.add("primary");
+    refs.loginAction.onclick = () => window.api.openLogin(accountId);
   }
-  if (state.last) renderPlatform(platform, state.last[platform] || {});
+  // Re-render to update button state
+  const data = accounts.find((a) => a.id === accountId);
+  if (data) renderAccount(accountId, data);
 }
 
 // ── Log ──
@@ -196,8 +339,7 @@ function appendLog(raw) {
   const cls = classifyLog(raw);
   if (cls) line.classList.add(cls);
 
-  // Parse "[ts] [平台] msg" — timestamp is ours, then optional platform tag
-  const m = raw.match(/^\[([^\]]+)\]\s*(\[(京东|淘宝)\]\s*)?(.*)$/);
+  const m = raw.match(/^\[([^\]]+)\]\s*(\[([^\]]+)\]\s*)?(.*)$/);
   if (m) {
     const ts = document.createElement("span");
     ts.className = "ts";
@@ -205,7 +347,10 @@ function appendLog(raw) {
     line.appendChild(ts);
     if (m[3]) {
       const tag = document.createElement("span");
-      tag.className = m[3] === "京东" ? "tag-jd" : "tag-tb";
+      // Determine color class from tag content
+      if (m[3].includes("京东")) tag.className = "tag-jd";
+      else if (m[3].includes("淘宝")) tag.className = "tag-tb";
+      else tag.className = "tag-jd"; // fallback
       tag.textContent = `[${m[3]}] `;
       line.appendChild(tag);
     }
@@ -219,15 +364,26 @@ function appendLog(raw) {
   logBox.scrollTop = logBox.scrollHeight;
 }
 
-// ── Events ──
-ui.jd.runBtn.onclick = () => window.api.runNow("jd");
-ui.tb.runBtn.onclick = () => window.api.runNow("tb");
+// ── Add account modal ──
+const platformModal = $("platformModal");
+const addAccountBtn = $("addAccountBtn");
+const modalCancelBtn = $("modalCancelBtn");
 
-jdIntervalSelect.onchange = () =>
-  window.api.updateConfig("jd", { hours: parseFloat(jdIntervalSelect.value) });
-tbIntervalSelect.onchange = () =>
-  window.api.updateConfig("tb", { hours: parseFloat(tbIntervalSelect.value) });
+addAccountBtn.onclick = () => platformModal.classList.add("show");
+modalCancelBtn.onclick = () => platformModal.classList.remove("show");
+platformModal.onclick = (e) => {
+  if (e.target === platformModal) platformModal.classList.remove("show");
+};
 
+for (const optBtn of document.querySelectorAll(".modal-option")) {
+  optBtn.onclick = async () => {
+    const type = optBtn.dataset.type;
+    platformModal.classList.remove("show");
+    await window.api.addAccount(type);
+  };
+}
+
+// ── Update ──
 updateBtn.onclick = () => {
   if (state.updateState === "available") {
     state.updateState = "downloading";
@@ -237,10 +393,11 @@ updateBtn.onclick = () => {
   }
 };
 
+// ── Events ──
 window.api.onLog(appendLog);
 window.api.onStatusUpdate(updateStatus);
-window.api.onLoginStatus(({ platform, loggedIn }) =>
-  setLoginStatus(platform, loggedIn)
+window.api.onLoginStatus(({ accountId, loggedIn }) =>
+  setLoginStatus(accountId, loggedIn)
 );
 
 window.api.onUpdateAvailable((version) => {
@@ -278,8 +435,8 @@ setInterval(async () => {
   window.api.rendererReady();
   appendLog(`[${new Date().toLocaleString("zh-CN")}] 应用启动完成`);
 
-  for (const p of PLATFORMS) {
-    const loggedIn = await window.api.checkLogin(p);
-    setLoginStatus(p, loggedIn);
+  for (const a of accounts) {
+    const loggedIn = await window.api.checkLogin(a.id);
+    setLoginStatus(a.id, loggedIn);
   }
 })();

@@ -176,8 +176,26 @@
     }
     .hero-meta strong { color: var(--text); font-weight: 500; }
 
-    /* ── Platform cards ── */
-    .platform-wrap { padding: 8px 32px 0; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0; }
+    /* ── Account list (scrollable) ── */
+    .account-scroll {
+      padding: 8px 32px 0;
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+    }
+    .account-scroll::-webkit-scrollbar { width: 6px; }
+    .account-scroll::-webkit-scrollbar-thumb {
+      background: rgba(0,0,0,0.08);
+      border-radius: 3px;
+    }
+
+    .account-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* ── Platform card ── */
     .platform {
       background: var(--surface);
       border-radius: 14px;
@@ -197,6 +215,29 @@
     }
     .platform-name.jd { color: var(--jd-color); }
     .platform-name.tb { color: var(--tb-color); }
+    .platform-nickname {
+      font-size: 13px;
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .btn-remove {
+      margin-left: 4px;
+      background: none;
+      border: none;
+      color: var(--text-subtle);
+      font-size: 16px;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 6px;
+      line-height: 1;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-remove:hover {
+      background: rgba(224, 67, 59, 0.08);
+      color: var(--danger);
+    }
+
     .login-pill {
       display: flex;
       align-items: center;
@@ -234,7 +275,7 @@
       margin-left: 2px;
     }
     .login-pill .action::before {
-      content: '·';
+      content: '\00b7';
       margin-right: 4px;
       color: inherit;
       opacity: 0.5;
@@ -337,13 +378,112 @@
       animation: jd-sweep 1.8s linear infinite;
     }
 
+    /* ── Add account ── */
+    .add-account-bar {
+      padding: 12px 0 4px;
+      display: flex;
+      justify-content: center;
+    }
+    .btn-add {
+      background: none;
+      border: 1px dashed var(--line-strong);
+      border-radius: 10px;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-family: inherit;
+      padding: 8px 20px;
+      cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+      width: 100%;
+    }
+    .btn-add:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* ── Platform picker modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.3);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal-box {
+      background: var(--surface);
+      border-radius: 16px;
+      padding: 24px;
+      width: 280px;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+    }
+    .modal-title {
+      font-size: 15px;
+      font-weight: 600;
+      text-align: center;
+      margin-bottom: 18px;
+    }
+    .modal-options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .modal-option {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: var(--surface-2);
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      font-family: inherit;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .modal-option:hover {
+      border-color: var(--line-strong);
+      background: var(--surface);
+    }
+    .modal-option .platform-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .modal-option .platform-icon.jd { background: var(--jd-color); }
+    .modal-option .platform-icon.tb { background: var(--tb-color); }
+    .modal-cancel {
+      margin-top: 14px;
+      text-align: center;
+    }
+    .modal-cancel button {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    .modal-cancel button:hover { color: var(--text); }
+
     /* ── Log ── */
     .log-wrap {
       padding: 16px 32px 12px;
-      flex: 1;
-      min-height: 0;
+      height: 200px;
+      min-height: 140px;
       display: flex;
       flex-direction: column;
+      flex-shrink: 0;
     }
     .log-head {
       display: flex;
@@ -430,106 +570,31 @@
     </div>
   </div>
 
-  <!-- Platforms -->
-  <div class="platform-wrap">
-    <!-- JD -->
-    <div class="platform" id="card-jd">
-      <div class="platform-head">
-        <span class="dot muted" id="jd-dot"><span class="pulse"></span><span class="inner"></span></span>
-        <span class="platform-name jd">京东</span>
-        <span class="login-pill" id="jd-loginPill">
-          <span class="pill-dot"></span>
-          <span id="jd-loginText">检测中…</span>
-          <button class="action" id="jd-loginAction" style="display:none"></button>
-        </span>
-      </div>
-      <div class="platform-stats">
-        <div>
-          <div class="stat-label">累计</div>
-          <div class="stat-value jd-num" id="jd-saved">¥0.00</div>
-          <div class="stat-meta jd-num" id="jd-savedMeta">0 件</div>
-        </div>
-        <div>
-          <div class="stat-label">上次运行</div>
-          <div class="stat-value pending" id="jd-lastRun">--</div>
-          <div class="stat-meta" id="jd-lastResult"></div>
-        </div>
-        <div>
-          <div class="stat-label">下次运行</div>
-          <div class="stat-value pending" id="jd-nextRun">--</div>
-          <div class="stat-meta" id="jd-nextRunMeta"></div>
-        </div>
-      </div>
-      <div class="platform-actions">
-        <div class="interval">
-          <span>每</span>
-          <select id="jd-intervalSelect">
-            <option value="0.5">30 分钟</option>
-            <option value="1">1 小时</option>
-            <option value="2" selected>2 小时</option>
-            <option value="4">4 小时</option>
-            <option value="6">6 小时</option>
-            <option value="8">8 小时</option>
-            <option value="12">12 小时</option>
-            <option value="24">24 小时</option>
-          </select>
-          <span>执行一次</span>
-        </div>
-        <button class="btn-run" id="jd-runBtn">
-          <span id="jd-runBtnText">立即执行</span>
-        </button>
-      </div>
-      <div class="progress-strip" id="jd-progress"></div>
+  <!-- Accounts (dynamic, scrollable) -->
+  <div class="account-scroll">
+    <div class="account-list" id="accountList"></div>
+    <div class="add-account-bar">
+      <button class="btn-add" id="addAccountBtn">+ 添加账号</button>
     </div>
+  </div>
 
-    <!-- TB -->
-    <div class="platform" id="card-tb">
-      <div class="platform-head">
-        <span class="dot muted" id="tb-dot"><span class="pulse"></span><span class="inner"></span></span>
-        <span class="platform-name tb">淘宝</span>
-        <span class="login-pill" id="tb-loginPill">
-          <span class="pill-dot"></span>
-          <span id="tb-loginText">检测中…</span>
-          <button class="action" id="tb-loginAction" style="display:none"></button>
-        </span>
-      </div>
-      <div class="platform-stats">
-        <div>
-          <div class="stat-label">累计</div>
-          <div class="stat-value jd-num" id="tb-saved">¥0.00</div>
-          <div class="stat-meta jd-num" id="tb-savedMeta">0 件</div>
-        </div>
-        <div>
-          <div class="stat-label">上次运行</div>
-          <div class="stat-value pending" id="tb-lastRun">--</div>
-          <div class="stat-meta" id="tb-lastResult"></div>
-        </div>
-        <div>
-          <div class="stat-label">下次运行</div>
-          <div class="stat-value pending" id="tb-nextRun">--</div>
-          <div class="stat-meta" id="tb-nextRunMeta"></div>
-        </div>
-      </div>
-      <div class="platform-actions">
-        <div class="interval">
-          <span>每</span>
-          <select id="tb-intervalSelect">
-            <option value="0.5">30 分钟</option>
-            <option value="1">1 小时</option>
-            <option value="2" selected>2 小时</option>
-            <option value="4">4 小时</option>
-            <option value="6">6 小时</option>
-            <option value="8">8 小时</option>
-            <option value="12">12 小时</option>
-            <option value="24">24 小时</option>
-          </select>
-          <span>执行一次</span>
-        </div>
-        <button class="btn-run" id="tb-runBtn">
-          <span id="tb-runBtnText">立即执行</span>
+  <!-- Platform picker modal -->
+  <div class="modal-overlay" id="platformModal">
+    <div class="modal-box">
+      <div class="modal-title">选择平台</div>
+      <div class="modal-options">
+        <button class="modal-option" data-type="jd">
+          <span class="platform-icon jd">京</span>
+          <span>京东</span>
+        </button>
+        <button class="modal-option" data-type="tb">
+          <span class="platform-icon tb">淘</span>
+          <span>淘宝</span>
         </button>
       </div>
-      <div class="progress-strip" id="tb-progress"></div>
+      <div class="modal-cancel">
+        <button id="modalCancelBtn">取消</button>
+      </div>
     </div>
   </div>
 
