@@ -17,7 +17,6 @@ const MOBILE_UA =
 const PLATFORMS = {
   jd: {
     name: "京东",
-    partition: "persist:jd",
     targetUrl:
       "https://h5.m.jd.com/babelDiy/Zeus/2RePMzTqg6UoffvMwtwVeMcnPGeg/index.html?defaultViewTab=0&appId=cuser&type=25#/",
     loginUrl: "https://plogin.m.jd.com/login/login",
@@ -27,22 +26,25 @@ const PLATFORMS = {
   },
   tb: {
     name: "淘宝",
-    partition: "persist:tb",
     targetUrl:
       "https://pages-fast.m.taobao.com/wow/a/act/tmall/dailygroup/16261/16699/wupr?wh_pid=daily-541787&disableNav=YES",
     loginUrl: "https://main.m.taobao.com/?sprefer=sypc00",
     cookieDomain: ".taobao.com",
-    loginCookies: ["cookie2", "_tb_token_"],
+    loginCookies: ["cookie2", "_tb_token_", "unb"],
     idCookie: "unb",
     nickCookies: ["_nk_", "lgc", "tracknick"],
   },
 };
 
-// ─── 持久化存储（含旧版扁平结构迁移） ─────────────────────────
+// ─── 持久化存储 ───────────────────────────────────────────────
 const STORE_PATH = path.join(app.getPath("userData"), "settings.json");
 
-function emptyJd() {
+function emptyAccount(type) {
   return {
+    id: null,
+    type,
+    partition: null, // 为 null 时自动用 persist:{id}，迁移账号保留原始值
+    nickname: null,
     intervalHours: 2,
     lastRunTime: null,
     lastRunResult: null,
@@ -50,14 +52,23 @@ function emptyJd() {
     totalSuccessCount: 0,
   };
 }
-function emptyTb() {
-  return {
-    intervalHours: 2,
-    lastRunTime: null,
-    lastRunResult: null,
-    totalSaved: 0,
-    totalSuccessCount: 0,
-  };
+
+function getPartition(account) {
+  if (account.partition) return account.partition;
+  // 兼容旧版迁移的首个账号，其 session 数据仍在 persist:jd / persist:tb
+  if (account.id === `${account.type}_1`) return `persist:${account.type}`;
+  return `persist:${account.id}`;
+}
+
+function generateId(type, accounts) {
+  let max = 0;
+  for (const a of accounts) {
+    if (a.type === type) {
+      const num = parseInt(a.id.split("_")[1]) || 0;
+      if (num > max) max = num;
+    }
+  }
+  return `${type}_${max + 1}`;
 }
 
 function loadStore() {
@@ -65,24 +76,53 @@ function loadStore() {
   try {
     raw = JSON.parse(fs.readFileSync(STORE_PATH, "utf-8"));
   } catch {
-    return { jd: emptyJd(), tb: emptyTb() };
-  }
-  // 旧版：{ intervalHours, lastRunTime, ... } —— 迁移到 jd
-  if (!raw.jd && !raw.tb) {
+    // 首次启动：默认创建京东和淘宝各一个账号
     return {
-      jd: {
+      accounts: [
+        { ...emptyAccount("jd"), id: "jd_1" },
+        { ...emptyAccount("tb"), id: "tb_1" },
+      ],
+    };
+  }
+
+  // 新格式
+  if (raw.accounts) {
+    // 确保每个账号都有完整字段
+    return {
+      accounts: raw.accounts.map((a) => ({
+        ...emptyAccount(a.type),
+        ...a,
+      })),
+    };
+  }
+
+  // 旧版双平台格式: { jd: {...}, tb: {...} }
+  if (raw.jd || raw.tb) {
+    const accounts = [];
+    if (raw.jd) {
+      accounts.push({ ...emptyAccount("jd"), ...raw.jd, id: "jd_1", partition: "persist:jd" });
+    }
+    if (raw.tb) {
+      accounts.push({ ...emptyAccount("tb"), ...raw.tb, id: "tb_1", partition: "persist:tb" });
+    }
+    return { accounts };
+  }
+
+  // 更旧的扁平格式（v1.0 之前）
+  return {
+    accounts: [
+      {
+        ...emptyAccount("jd"),
+        id: "jd_1",
+        partition: "persist:jd",
         intervalHours: raw.intervalHours || 2,
         lastRunTime: raw.lastRunTime || null,
         lastRunResult: raw.lastRunResult || null,
         totalSaved: raw.totalSaved || 0,
         totalSuccessCount: raw.totalSuccessCount || 0,
       },
-      tb: emptyTb(),
-    };
-  }
-  return {
-    jd: { ...emptyJd(), ...(raw.jd || {}) },
-    tb: { ...emptyTb(), ...(raw.tb || {}) },
+      { ...emptyAccount("tb"), id: "tb_1", partition: "persist:tb" },
+    ],
   };
 }
 
@@ -92,20 +132,59 @@ function saveStore() {
 
 let store = loadStore();
 
+function getAccount(accountId) {
+  return store.accounts.find((a) => a.id === accountId);
+}
+
 // ─── 全局状态 ─────────────────────────────────────────────────
 let mainWindow = null;
 let rendererReady = false;
 let isQuitting = false;
 const logs = [];
 
-const runtime = {
-  jd: { isRunning: false, timer: null },
-  tb: { isRunning: false, timer: null },
-};
+// Runtime state: per-account
+const runtime = new Map();
+for (const a of store.accounts) {
+  runtime.set(a.id, { isRunning: false, timer: null });
+}
+
+// 串行执行队列
+const taskQueue = [];
+let isProcessingQueue = false;
+
+function enqueueRun(accountId, manual = false) {
+  // 如果已在队列中，跳过
+  if (taskQueue.some((t) => t.accountId === accountId)) {
+    addLog(accountId, "任务已在队列中，跳过");
+    return;
+  }
+  taskQueue.push({ accountId, manual });
+  processQueue();
+}
+
+async function processQueue() {
+  if (isProcessingQueue) return;
+  isProcessingQueue = true;
+  while (taskQueue.length > 0) {
+    const { accountId, manual } = taskQueue.shift();
+    await runPlatform(accountId, manual);
+  }
+  isProcessingQueue = false;
+}
 
 // ─── 日志 ──────────────────────────────────────────────────────
-function addLog(platform, msg) {
-  const tag = platform ? `[${PLATFORMS[platform].name}] ` : "";
+function addLog(accountId, msg) {
+  let tag = "";
+  if (accountId) {
+    const account = getAccount(accountId);
+    if (account) {
+      const cfg = PLATFORMS[account.type];
+      const name = account.nickname
+        ? `${cfg.name}·${account.nickname}`
+        : cfg.name;
+      tag = `[${name}] `;
+    }
+  }
   const entry = `[${new Date().toLocaleString("zh-CN")}] ${tag}${msg}`;
   logs.push(entry);
   if (logs.length > 200) logs.shift();
@@ -115,39 +194,31 @@ function addLog(platform, msg) {
 }
 
 // ─── 状态推送 ──────────────────────────────────────────────────
-function getJdNextRun() {
-  if (!store.jd.lastRunTime) return null;
+function getNextRun(account) {
+  if (!account.lastRunTime) return null;
   return new Date(
-    new Date(store.jd.lastRunTime).getTime() + store.jd.intervalHours * 3600000
-  ).toISOString();
-}
-
-function getTbNextRun() {
-  if (!store.tb.lastRunTime) return null;
-  return new Date(
-    new Date(store.tb.lastRunTime).getTime() + store.tb.intervalHours * 3600000
+    new Date(account.lastRunTime).getTime() +
+      account.intervalHours * 3600000
   ).toISOString();
 }
 
 function buildStatus() {
+  let totalSaved = 0;
+  let totalCount = 0;
+  const accountStatuses = store.accounts.map((a) => {
+    totalSaved += a.totalSaved || 0;
+    totalCount += a.totalSuccessCount || 0;
+    const rt = runtime.get(a.id) || { isRunning: false, timer: null };
+    return {
+      ...a,
+      isRunning: rt.isRunning,
+      schedulerRunning: !!rt.timer,
+      nextRunTime: getNextRun(a),
+    };
+  });
   return {
-    jd: {
-      ...store.jd,
-      isRunning: runtime.jd.isRunning,
-      schedulerRunning: !!runtime.jd.timer,
-      nextRunTime: getJdNextRun(),
-    },
-    tb: {
-      ...store.tb,
-      isRunning: runtime.tb.isRunning,
-      schedulerRunning: !!runtime.tb.timer,
-      nextRunTime: getTbNextRun(),
-    },
-    totals: {
-      saved: (store.jd.totalSaved || 0) + (store.tb.totalSaved || 0),
-      count:
-        (store.jd.totalSuccessCount || 0) + (store.tb.totalSuccessCount || 0),
-    },
+    accounts: accountStatuses,
+    totals: { saved: totalSaved, count: totalCount },
     appVersion: app.getVersion(),
   };
 }
@@ -158,72 +229,100 @@ function sendStatus() {
   }
 }
 
-function sendLoginStatus(platform, loggedIn) {
+function sendLoginStatus(accountId, loggedIn) {
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send("login-status", { platform, loggedIn });
+    mainWindow.webContents.send("login-status", { accountId, loggedIn });
   }
 }
 
 // ─── 登录检测 ──────────────────────────────────────────────────
-async function checkLogin(platform) {
-  const cfg = PLATFORMS[platform];
-  const ses = session.fromPartition(cfg.partition);
+async function checkLogin(accountId) {
+  const account = getAccount(accountId);
+  if (!account) return false;
+  const cfg = PLATFORMS[account.type];
+  const ses = session.fromPartition(getPartition(account));
   try {
     const cookies = await ses.cookies.get({ domain: cfg.cookieDomain });
     const ok = cfg.loginCookies.every((name) =>
       cookies.some((c) => c.name === name && c.value)
     );
     let displayName = null;
-    // Try nickname cookies first (TB), then fall back to idCookie
     if (cfg.nickCookies) {
       for (const name of cfg.nickCookies) {
         const val = cookies.find((c) => c.name === name)?.value;
-        if (val) { displayName = decodeURIComponent(val); break; }
+        if (val) {
+          displayName = decodeURIComponent(val);
+          break;
+        }
       }
     }
     if (!displayName) {
       const idVal = cookies.find((c) => c.name === cfg.idCookie)?.value;
-      displayName = idVal ? decodeURIComponent(idVal) : "?";
+      displayName = idVal ? decodeURIComponent(idVal) : null;
+    }
+    // 更新昵称
+    if (displayName && displayName !== account.nickname) {
+      account.nickname = displayName;
+      saveStore();
     }
     addLog(
-      platform,
-      ok ? `登录状态有效 (${displayName})` : "未检测到有效登录 cookie"
+      accountId,
+      ok
+        ? `登录状态有效${displayName ? " (" + displayName + ")" : ""}`
+        : "未检测到有效登录 cookie"
     );
     return ok;
   } catch (err) {
-    addLog(platform, `检测登录状态出错: ${err.message}`);
+    addLog(accountId, `检测登录状态出错: ${err.message}`);
     return false;
   }
 }
 
 // ─── 登录窗口 ──────────────────────────────────────────────────
-function openLoginWindow(platform) {
-  const cfg = PLATFORMS[platform];
+function openLoginWindow(accountId) {
+  const account = getAccount(accountId);
+  if (!account) return;
+  const cfg = PLATFORMS[account.type];
   const win = new BrowserWindow({
     width: 420,
     height: 750,
     title: `${cfg.name}登录`,
-    webPreferences: { partition: cfg.partition },
+    webPreferences: { partition: getPartition(account) },
   });
   win.loadURL(cfg.loginUrl, { userAgent: MOBILE_UA });
-  addLog(platform, "已打开登录窗口，请完成登录");
+  addLog(accountId, "已打开登录窗口，请完成登录");
 
   win.webContents.on("did-navigate", async (_e, url) => {
     if (!url.includes("login") && !url.includes("passport")) {
-      const ok = await checkLogin(platform);
+      const ok = await checkLogin(accountId);
       if (ok) {
-        addLog(platform, "登录成功！");
+        account.isNew = false;
+        saveStore();
+        addLog(accountId, "登录成功！");
         win.close();
-        sendLoginStatus(platform, true);
-        startScheduler(platform);
+        sendLoginStatus(accountId, true);
+        startScheduler(accountId);
       }
     }
   });
 
   win.on("closed", async () => {
-    const ok = await checkLogin(platform);
-    sendLoginStatus(platform, ok);
-    if (ok) startScheduler(platform);
+    const ok = await checkLogin(accountId);
+    if (!ok && account.isNew) {
+      // 新增账号未完成登录，自动删除
+      stopScheduler(accountId);
+      const ses = session.fromPartition(getPartition(account));
+      await ses.clearStorageData();
+      const idx = store.accounts.findIndex((a) => a.id === accountId);
+      if (idx !== -1) store.accounts.splice(idx, 1);
+      runtime.delete(accountId);
+      saveStore();
+      addLog(null, `${cfg.name}账号未登录，已自动移除`);
+      sendStatus();
+      return;
+    }
+    sendLoginStatus(accountId, ok);
+    if (ok) startScheduler(accountId);
   });
 }
 
@@ -297,7 +396,11 @@ function extractJdResults(responses) {
   let historyCount = 0;
   for (const resp of responses) {
     let data;
-    try { data = JSON.parse(resp.body); } catch { continue; }
+    try {
+      data = JSON.parse(resp.body);
+    } catch {
+      continue;
+    }
     if (data?.code === 0 && data.data?.totalPriceproSuccAmount != null) {
       historyTotal = parseFloat(data.data.totalPriceproSuccAmount) || 0;
       historyCount = parseInt(data.data.totalCount) || 0;
@@ -305,21 +408,35 @@ function extractJdResults(responses) {
     }
   }
 
-  if (DEBUG) addLog("jd", `[DEBUG] 解析结果: amount=${totalAmount}, history=${historyTotal}/${historyCount}`);
+  if (DEBUG)
+    addLog(
+      null,
+      `[DEBUG-JD] 解析结果: amount=${totalAmount}, history=${historyTotal}/${historyCount}`
+    );
 
-  return { totalAmount, successCount, details, hasApi: priceResponses.length > 0, historyTotal, historyCount };
+  return {
+    totalAmount,
+    successCount,
+    details,
+    hasApi: priceResponses.length > 0,
+    historyTotal,
+    historyCount,
+  };
 }
 
-async function runJd(manual) {
+async function runJd(account, manual) {
   const cfg = PLATFORMS.jd;
-  addLog("jd", manual ? "手动触发：开始执行..." : "开始执行价格保护申请...");
+  addLog(
+    account.id,
+    manual ? "手动触发：开始执行..." : "开始执行价格保护申请..."
+  );
 
   const win = new BrowserWindow({
     width: 375,
     height: 812,
     show: DEBUG,
     webPreferences: {
-      partition: cfg.partition,
+      partition: getPartition(account),
       preload: path.join(__dirname, "jd-preload.js"),
       contextIsolation: false,
       sandbox: false,
@@ -333,7 +450,7 @@ async function runJd(manual) {
     const loaded = new Promise((resolve) => {
       win.webContents.on("did-finish-load", () => resolve("loaded"));
       win.webContents.on("did-fail-load", (_e, code, desc) => {
-        addLog("jd", `页面加载失败: ${desc} (${code})`);
+        addLog(account.id, `页面加载失败: ${desc} (${code})`);
         resolve("failed");
       });
       setTimeout(() => resolve("timeout-30s"), 30000);
@@ -360,7 +477,7 @@ async function runJd(manual) {
     `);
 
     if (clicked) {
-      addLog("jd", `已点击「${clicked}」按钮`);
+      addLog(account.id, `已点击「${clicked}」按钮`);
       await delay(5000);
       const confirmed = await win.webContents.executeJavaScript(`
         (function() {
@@ -378,10 +495,10 @@ async function runJd(manual) {
           return null;
         })()
       `);
-      if (confirmed) addLog("jd", `已点击「${confirmed}」确认按钮`);
+      if (confirmed) addLog(account.id, `已点击「${confirmed}」确认按钮`);
       await delay(8000);
     } else {
-      addLog("jd", "未找到价格保护按钮，可能无可申请的订单");
+      addLog(account.id, "未找到价格保护按钮，可能无可申请的订单");
     }
 
     const raw = await win.webContents.executeJavaScript(
@@ -390,43 +507,46 @@ async function runJd(manual) {
     const responses = JSON.parse(raw);
 
     if (DEBUG) {
-      addLog("jd", `[DEBUG] 共捕获 ${responses.length} 个 API 响应`);
+      addLog(account.id, `[DEBUG] 共捕获 ${responses.length} 个 API 响应`);
       for (const r of responses) {
-        addLog("jd", `[DEBUG] ${r.url.slice(0, 80)}: ${r.body.slice(0, 500)}`);
+        addLog(
+          account.id,
+          `[DEBUG] ${r.url.slice(0, 80)}: ${r.body.slice(0, 500)}`
+        );
       }
     }
 
     const result = extractJdResults(responses);
-    result.details.forEach((d) => addLog("jd", `  ${d}`));
+    result.details.forEach((d) => addLog(account.id, `  ${d}`));
 
     if (result.totalAmount > 0) {
       addLog(
-        "jd",
+        account.id,
         `价保成功！共 ${result.successCount} 件商品，退款 ¥${result.totalAmount.toFixed(2)}`
       );
+      const displayName = account.nickname || PLATFORMS[account.type].name;
       new Notification({
         title: "价保助手",
-        body: `京东价保成功！退款 ¥${result.totalAmount.toFixed(2)}`,
+        body: `${displayName} 价保成功！退款 ¥${result.totalAmount.toFixed(2)}`,
       }).show();
-      store.jd.lastRunResult = `成功 ¥${result.totalAmount.toFixed(2)}`;
+      account.lastRunResult = `成功 ¥${result.totalAmount.toFixed(2)}`;
     } else if (result.hasApi) {
-      addLog("jd", "价保已申请，本次无退款");
-      store.jd.lastRunResult = clicked ? "已申请(无退款)" : "无可申请订单";
+      addLog(account.id, "价保已申请，本次无退款");
+      account.lastRunResult = clicked ? "已申请(无退款)" : "无可申请订单";
     } else {
-      store.jd.lastRunResult = clicked ? "已申请(无API)" : "无可申请订单";
+      account.lastRunResult = clicked ? "已申请(无API)" : "无可申请订单";
     }
-    // 用平台返回的历史累计数据
     if (result.historyTotal > 0) {
-      store.jd.totalSaved = result.historyTotal;
-      store.jd.totalSuccessCount = result.historyCount;
+      account.totalSaved = result.historyTotal;
+      account.totalSuccessCount = result.historyCount;
     }
-    store.jd.lastRunTime = new Date().toISOString();
+    account.lastRunTime = new Date().toISOString();
     saveStore();
-    addLog("jd", "本次执行完成");
+    addLog(account.id, "本次执行完成");
   } catch (err) {
-    addLog("jd", "执行出错: " + err.message);
-    store.jd.lastRunResult = "出错: " + err.message;
-    store.jd.lastRunTime = new Date().toISOString();
+    addLog(account.id, "执行出错: " + err.message);
+    account.lastRunResult = "出错: " + err.message;
+    account.lastRunTime = new Date().toISOString();
     saveStore();
   } finally {
     if (!DEBUG) win.close();
@@ -445,29 +565,36 @@ function findByApiSuffix(responses, suffix) {
   return null;
 }
 
-function extractTbResults(responses) {
+function extractTbResults(responses, accountId) {
   let totalAmount = 0;
   let successCount = 0;
   const details = [];
   let coolingTime = 0;
 
   if (DEBUG) {
-    addLog("tb", `[DEBUG] 共捕获 ${responses.length} 个 mtop 响应`);
+    addLog(accountId, `[DEBUG] 共捕获 ${responses.length} 个 mtop 响应`);
     for (const r of responses) {
-      addLog("tb", `[DEBUG] ${r.api} (${r.via}): ${JSON.stringify(r.data?.data?.model || r.data?.model || r.data).slice(0, 200)}`);
+      addLog(
+        accountId,
+        `[DEBUG] ${r.api} (${r.via}): ${JSON.stringify(r.data?.data?.model || r.data?.model || r.data).slice(0, 200)}`
+      );
     }
   }
 
   const launch = findByApiSuffix(responses, "onceapply.launch");
   if (DEBUG && launch) {
-    const m = (launch.data?.data?.model) || launch.data?.model;
-    addLog("tb", `[DEBUG] launch: recordId=${m?.onceApplyRecordId}, waitSeconds=${m?.waitSeconds}`);
+    const m = launch.data?.data?.model || launch.data?.model;
+    addLog(
+      accountId,
+      `[DEBUG] launch: recordId=${m?.onceApplyRecordId}, waitSeconds=${m?.waitSeconds}`
+    );
   }
 
   const query = findByApiSuffix(responses, "onceapply.query");
   if (query && query.data) {
-    const model = (query.data.data && query.data.data.model) || query.data.model;
-    if (DEBUG) addLog("tb", `[DEBUG] query model: ${JSON.stringify(model)}`);
+    const model =
+      (query.data.data && query.data.data.model) || query.data.model;
+    if (DEBUG) addLog(accountId, `[DEBUG] query model: ${JSON.stringify(model)}`);
     if (model) {
       const fee = parseFloat(model.totalRefundFee) || 0;
       const num = parseInt(model.succNum || model.successNum || 0) || 0;
@@ -483,8 +610,9 @@ function extractTbResults(responses) {
   let historyTotal = 0;
   let historyCount = 0;
   if (base && base.data) {
-    const model = (base.data.data && base.data.data.model) || base.data.model;
-    if (DEBUG) addLog("tb", `[DEBUG] baseinfo model: ${JSON.stringify(model)}`);
+    const model =
+      (base.data.data && base.data.data.model) || base.data.model;
+    if (DEBUG) addLog(accountId, `[DEBUG] baseinfo model: ${JSON.stringify(model)}`);
     if (model) {
       if (model.coolingTime) {
         coolingTime = parseInt(model.coolingTime) || 0;
@@ -494,21 +622,35 @@ function extractTbResults(responses) {
     }
   }
 
-  if (DEBUG) addLog("tb", `[DEBUG] 解析结果: amount=${totalAmount}, count=${successCount}, coolingTime=${coolingTime}ms (${formatCooling(coolingTime)}), history=${historyTotal}/${historyCount}`);
+  if (DEBUG)
+    addLog(
+      accountId,
+      `[DEBUG] 解析结果: amount=${totalAmount}, count=${successCount}, coolingTime=${coolingTime}ms (${formatCooling(coolingTime)}), history=${historyTotal}/${historyCount}`
+    );
 
-  return { totalAmount, successCount, details, coolingTime, historyTotal, historyCount };
+  return {
+    totalAmount,
+    successCount,
+    details,
+    coolingTime,
+    historyTotal,
+    historyCount,
+  };
 }
 
-async function runTb(manual) {
+async function runTb(account, manual) {
   const cfg = PLATFORMS.tb;
-  addLog("tb", manual ? "手动触发：开始执行..." : "开始执行价格保护申请...");
+  addLog(
+    account.id,
+    manual ? "手动触发：开始执行..." : "开始执行价格保护申请..."
+  );
 
   const win = new BrowserWindow({
     width: 375,
     height: 812,
     show: DEBUG,
     webPreferences: {
-      partition: cfg.partition,
+      partition: getPartition(account),
       preload: path.join(__dirname, "tb-preload.js"),
       contextIsolation: false,
       sandbox: false,
@@ -522,7 +664,7 @@ async function runTb(manual) {
     const loaded = new Promise((resolve) => {
       win.webContents.on("did-finish-load", () => resolve("loaded"));
       win.webContents.on("did-fail-load", (_e, code, desc) => {
-        addLog("tb", `页面加载失败: ${desc} (${code})`);
+        addLog(account.id, `页面加载失败: ${desc} (${code})`);
         resolve("failed");
       });
       setTimeout(() => resolve("timeout-30s"), 30000);
@@ -531,7 +673,6 @@ async function runTb(manual) {
     await loaded;
     await delay(5000);
 
-    // 定位一键价保按钮：排除弹窗，优先底部 fixed/sticky 按钮
     const target = await win.webContents.executeJavaScript(`
       (function() {
         const BLOCK = /modal|affirm|dialog|popup|drawer|mask|tooltip/i;
@@ -586,13 +727,24 @@ async function runTb(manual) {
     `);
 
     if (target) {
-      win.webContents.sendInputEvent({ type: "mouseDown", x: target.x, y: target.y, button: "left", clickCount: 1 });
-      win.webContents.sendInputEvent({ type: "mouseUp", x: target.x, y: target.y, button: "left", clickCount: 1 });
+      win.webContents.sendInputEvent({
+        type: "mouseDown",
+        x: target.x,
+        y: target.y,
+        button: "left",
+        clickCount: 1,
+      });
+      win.webContents.sendInputEvent({
+        type: "mouseUp",
+        x: target.x,
+        y: target.y,
+        button: "left",
+        clickCount: 1,
+      });
       clicked = target.kw;
-      addLog("tb", `已点击「${clicked}」按钮`);
-      await delay(12000); // launch 会返回 waitSeconds，通常不超过 10s
+      addLog(account.id, `已点击「${clicked}」按钮`);
+      await delay(12000);
 
-      // 点「我知道了」关掉结果弹窗
       const ack = await win.webContents.executeJavaScript(`
         (function() {
           const keywords = ['我知道了', '知道了', '好的', '确定'];
@@ -616,46 +768,58 @@ async function runTb(manual) {
         })()
       `);
       if (ack) {
-        win.webContents.sendInputEvent({ type: "mouseDown", x: ack.x, y: ack.y, button: "left", clickCount: 1 });
-        win.webContents.sendInputEvent({ type: "mouseUp", x: ack.x, y: ack.y, button: "left", clickCount: 1 });
+        win.webContents.sendInputEvent({
+          type: "mouseDown",
+          x: ack.x,
+          y: ack.y,
+          button: "left",
+          clickCount: 1,
+        });
+        win.webContents.sendInputEvent({
+          type: "mouseUp",
+          x: ack.x,
+          y: ack.y,
+          button: "left",
+          clickCount: 1,
+        });
       }
     } else {
-      addLog("tb", "未找到一键价保按钮");
+      addLog(account.id, "未找到一键价保按钮");
     }
 
     const raw = await win.webContents.executeJavaScript(
       `JSON.stringify(window.__tbMtopResponses || [])`
     );
     const responses = JSON.parse(raw);
-    const result = extractTbResults(responses);
-    result.details.forEach((d) => addLog("tb", `  ${d}`));
+    const result = extractTbResults(responses, account.id);
+    result.details.forEach((d) => addLog(account.id, `  ${d}`));
 
     if (result.totalAmount > 0) {
       addLog(
-        "tb",
+        account.id,
         `价保成功！共 ${result.successCount} 件商品，退款 ¥${result.totalAmount.toFixed(2)}`
       );
+      const displayName = account.nickname || PLATFORMS[account.type].name;
       new Notification({
         title: "价保助手",
-        body: `淘宝价保成功！退款 ¥${result.totalAmount.toFixed(2)}`,
+        body: `${displayName} 价保成功！退款 ¥${result.totalAmount.toFixed(2)}`,
       }).show();
-      store.tb.lastRunResult = `成功 ¥${result.totalAmount.toFixed(2)}`;
+      account.lastRunResult = `成功 ¥${result.totalAmount.toFixed(2)}`;
     } else {
-      addLog("tb", "本次无退款");
-      store.tb.lastRunResult = clicked ? "已申请(无退款)" : "无可申请订单";
+      addLog(account.id, "本次无退款");
+      account.lastRunResult = clicked ? "已申请(无退款)" : "无可申请订单";
     }
-    // 用平台返回的历史累计数据
     if (result.historyTotal > 0) {
-      store.tb.totalSaved = result.historyTotal;
-      store.tb.totalSuccessCount = result.historyCount;
+      account.totalSaved = result.historyTotal;
+      account.totalSuccessCount = result.historyCount;
     }
-    store.tb.lastRunTime = new Date().toISOString();
+    account.lastRunTime = new Date().toISOString();
     saveStore();
-    addLog("tb", "本次执行完成");
+    addLog(account.id, "本次执行完成");
   } catch (err) {
-    addLog("tb", "执行出错: " + err.message);
-    store.tb.lastRunResult = "出错: " + err.message;
-    store.tb.lastRunTime = new Date().toISOString();
+    addLog(account.id, "执行出错: " + err.message);
+    account.lastRunResult = "出错: " + err.message;
+    account.lastRunTime = new Date().toISOString();
     saveStore();
   } finally {
     if (!DEBUG) win.close();
@@ -665,43 +829,55 @@ async function runTb(manual) {
 // ═══════════════════════════════════════════════════════════════
 // 统一入口
 // ═══════════════════════════════════════════════════════════════
-async function runPlatform(platform, manual = false) {
-  if (runtime[platform].isRunning) {
-    addLog(platform, "任务正在运行中，跳过");
+async function runPlatform(accountId, manual = false) {
+  const rt = runtime.get(accountId);
+  if (!rt) return;
+  if (rt.isRunning) {
+    addLog(accountId, "任务正在运行中，跳过");
     return;
   }
-  const ok = await checkLogin(platform);
+  const account = getAccount(accountId);
+  if (!account) return;
+
+  const ok = await checkLogin(accountId);
   if (!ok) {
-    addLog(platform, "登录已过期，请重新登录后再执行");
-    sendLoginStatus(platform, false);
-    stopScheduler(platform);
+    addLog(accountId, "登录已过期，请重新登录后再执行");
+    sendLoginStatus(accountId, false);
+    stopScheduler(accountId);
     return;
   }
-  runtime[platform].isRunning = true;
+  rt.isRunning = true;
   sendStatus();
   try {
-    if (platform === "jd") await runJd(manual);
-    else await runTb(manual);
+    if (account.type === "jd") await runJd(account, manual);
+    else await runTb(account, manual);
   } finally {
-    runtime[platform].isRunning = false;
+    rt.isRunning = false;
     sendStatus();
   }
 }
 
 // ─── 调度 ──────────────────────────────────────────────────────
-function startScheduler(platform) {
-  stopScheduler(platform);
-  const ms = store[platform].intervalHours * 3600000;
-  runtime[platform].timer = setInterval(() => runPlatform(platform), ms);
-  addLog(platform, `定时任务已启动，每 ${store[platform].intervalHours} 小时执行一次`);
+function startScheduler(accountId) {
+  stopScheduler(accountId);
+  const account = getAccount(accountId);
+  if (!account) return;
+  const ms = account.intervalHours * 3600000;
+  const rt = runtime.get(accountId);
+  if (!rt) return;
+  rt.timer = setInterval(() => enqueueRun(accountId), ms);
+  addLog(
+    accountId,
+    `定时任务已启动，每 ${account.intervalHours} 小时执行一次`
+  );
   sendStatus();
 }
 
-function stopScheduler(platform) {
-  const t = runtime[platform].timer;
-  if (!t) return;
-  clearInterval(t);
-  runtime[platform].timer = null;
+function stopScheduler(accountId) {
+  const rt = runtime.get(accountId);
+  if (!rt || !rt.timer) return;
+  clearInterval(rt.timer);
+  rt.timer = null;
 }
 
 // ─── IPC ───────────────────────────────────────────────────────
@@ -709,36 +885,74 @@ ipcMain.on("renderer-ready", () => {
   rendererReady = true;
 });
 
-ipcMain.handle("check-login", async (_e, platform) => {
-  const ok = await checkLogin(platform);
-  if (ok && !runtime[platform].timer) startScheduler(platform);
+ipcMain.handle("check-login", async (_e, accountId) => {
+  const ok = await checkLogin(accountId);
+  const rt = runtime.get(accountId);
+  if (ok && rt && !rt.timer) startScheduler(accountId);
   return ok;
 });
 
-ipcMain.on("open-login", (_e, platform) => openLoginWindow(platform));
+ipcMain.on("open-login", (_e, accountId) => openLoginWindow(accountId));
 
-ipcMain.on("run-now", (_e, platform) => runPlatform(platform, true));
+ipcMain.on("run-now", (_e, accountId) => enqueueRun(accountId, true));
 
-ipcMain.handle("logout", async (_e, platform) => {
-  stopScheduler(platform);
-  const ses = session.fromPartition(PLATFORMS[platform].partition);
+ipcMain.handle("logout", async (_e, accountId) => {
+  stopScheduler(accountId);
+  const account = getAccount(accountId);
+  if (!account) return;
+  const ses = session.fromPartition(getPartition(account));
   await ses.clearStorageData();
-  const preserved = store[platform].intervalHours;
-  store[platform] = { ...(platform === "jd" ? emptyJd() : emptyTb()), intervalHours: preserved };
+  const preserved = account.intervalHours;
+  Object.assign(account, emptyAccount(account.type), {
+    id: account.id,
+    intervalHours: preserved,
+  });
   saveStore();
-  addLog(platform, "已清除登录信息");
-  sendLoginStatus(platform, false);
+  addLog(accountId, "已清除登录信息");
+  sendLoginStatus(accountId, false);
   sendStatus();
 });
 
-ipcMain.on("update-config", (_e, platform, cfg) => {
+ipcMain.on("update-config", (_e, accountId, cfg) => {
+  const account = getAccount(accountId);
+  if (!account) return;
   if (typeof cfg.hours === "number") {
-    store[platform].intervalHours = cfg.hours;
+    account.intervalHours = cfg.hours;
     saveStore();
-    if (runtime[platform].timer) startScheduler(platform);
-    addLog(platform, `运行间隔已更新为 ${cfg.hours} 小时`);
+    const rt = runtime.get(accountId);
+    if (rt && rt.timer) startScheduler(accountId);
+    addLog(accountId, `运行间隔已更新为 ${cfg.hours} 小时`);
   }
   sendStatus();
+});
+
+ipcMain.handle("add-account", async (_e, type) => {
+  if (!PLATFORMS[type]) return null;
+  const id = generateId(type, store.accounts);
+  const account = { ...emptyAccount(type), id, isNew: true };
+  store.accounts.push(account);
+  runtime.set(id, { isRunning: false, timer: null });
+  saveStore();
+  sendStatus();
+  addLog(id, "账号已创建");
+  // 自动打开登录窗口
+  openLoginWindow(id);
+  return account;
+});
+
+ipcMain.handle("remove-account", async (_e, accountId) => {
+  const idx = store.accounts.findIndex((a) => a.id === accountId);
+  if (idx === -1) return false;
+  stopScheduler(accountId);
+  const account = store.accounts[idx];
+  const ses = session.fromPartition(getPartition(account));
+  await ses.clearStorageData();
+  store.accounts.splice(idx, 1);
+  runtime.delete(accountId);
+  saveStore();
+  addLog(null, `已删除账号 ${account.nickname || PLATFORMS[account.type].name}`);
+  sendStatus();
+  return true;
 });
 
 ipcMain.handle("get-status", () => ({
@@ -800,7 +1014,10 @@ app.whenReady().then(async () => {
   );
   autoUpdater.on("download-progress", (progress) => {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("update-progress", Math.round(progress.percent));
+      mainWindow.webContents.send(
+        "update-progress",
+        Math.round(progress.percent)
+      );
     }
   });
   autoUpdater.on("update-downloaded", () => {
@@ -813,6 +1030,7 @@ app.whenReady().then(async () => {
     if (DEBUG) addLog(null, `更新检查失败: ${err.message}`);
   });
   autoUpdater.checkForUpdates().catch(() => {});
+  setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 2 * 3600000);
 
   app.on("activate", () => {
     if (mainWindow) mainWindow.show();
@@ -821,8 +1039,9 @@ app.whenReady().then(async () => {
 
 app.on("before-quit", () => {
   isQuitting = true;
-  stopScheduler("jd");
-  stopScheduler("tb");
+  for (const a of store.accounts) {
+    stopScheduler(a.id);
+  }
 });
 
 app.on("window-all-closed", () => {

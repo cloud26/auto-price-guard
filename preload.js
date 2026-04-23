@@ -2,13 +2,15 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("api", {
   rendererReady: () => ipcRenderer.send("renderer-ready"),
-  checkLogin: (platform) => ipcRenderer.invoke("check-login", platform),
-  openLogin: (platform) => ipcRenderer.send("open-login", platform),
-  runNow: (platform) => ipcRenderer.send("run-now", platform),
-  logout: (platform) => ipcRenderer.invoke("logout", platform),
-  updateConfig: (platform, cfg) =>
-    ipcRenderer.send("update-config", platform, cfg),
+  checkLogin: (accountId) => ipcRenderer.invoke("check-login", accountId),
+  openLogin: (accountId) => ipcRenderer.send("open-login", accountId),
+  runNow: (accountId) => ipcRenderer.send("run-now", accountId),
+  logout: (accountId) => ipcRenderer.invoke("logout", accountId),
+  updateConfig: (accountId, cfg) =>
+    ipcRenderer.send("update-config", accountId, cfg),
   getStatus: () => ipcRenderer.invoke("get-status"),
+  addAccount: (type) => ipcRenderer.invoke("add-account", type),
+  removeAccount: (id) => ipcRenderer.invoke("remove-account", id),
   downloadUpdate: () => ipcRenderer.send("download-update"),
   installUpdate: () => ipcRenderer.send("install-update"),
 
