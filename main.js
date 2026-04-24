@@ -251,14 +251,14 @@ async function checkLogin(accountId) {
       for (const name of cfg.nickCookies) {
         const val = cookies.find((c) => c.name === name)?.value;
         if (val) {
-          displayName = decodeURIComponent(val);
+          displayName = decodeCookieValue(val);
           break;
         }
       }
     }
     if (!displayName) {
       const idVal = cookies.find((c) => c.name === cfg.idCookie)?.value;
-      displayName = idVal ? decodeURIComponent(idVal) : null;
+      displayName = idVal ? decodeCookieValue(idVal) : null;
     }
     // 更新昵称
     if (displayName && displayName !== account.nickname) {
@@ -327,6 +327,15 @@ function openLoginWindow(accountId) {
 }
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function decodeCookieValue(val) {
+  const decoded = decodeURIComponent(val);
+  try {
+    return JSON.parse(`"${decoded}"`);
+  } catch {
+    return decoded;
+  }
+}
 
 function formatCooling(ms) {
   const totalSec = Math.ceil(ms / 1000);
