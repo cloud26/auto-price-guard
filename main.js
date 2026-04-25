@@ -283,6 +283,7 @@ function openLoginWindow(accountId) {
   const account = getAccount(accountId);
   if (!account) return;
   const cfg = PLATFORMS[account.type];
+  const ses = session.fromPartition(getPartition(account));
   const win = new BrowserWindow({
     width: 420,
     height: 750,
@@ -292,26 +293,52 @@ function openLoginWindow(accountId) {
   win.loadURL(cfg.loginUrl, { userAgent: MOBILE_UA });
   addLog(accountId, "已打开登录窗口，请完成登录");
 
-  win.webContents.on("did-navigate", async (_e, url) => {
+  let detected = false;
+
+  async function handleLoginSuccess() {
+    if (detected || win.isDestroyed()) return;
+    // 静默校验，避免 checkLogin 在每次 cookie 抖动时刷日志
+    const cookies = await ses.cookies.get({ domain: cfg.cookieDomain });
+    const allPresent = cfg.loginCookies.every((name) =>
+      cookies.some((c) => c.name === name && c.value)
+    );
+    if (!allPresent) return;
+    detected = true;
+    ses.cookies.removeListener("changed", onCookieChanged);
+    const ok = await checkLogin(accountId);
+    if (!ok) {
+      detected = false; // 让后续事件再试
+      ses.cookies.on("changed", onCookieChanged);
+      return;
+    }
+    account.isNew = false;
+    saveStore();
+    addLog(accountId, "登录成功！");
+    if (!win.isDestroyed()) win.close();
+    sendLoginStatus(accountId, true);
+    startScheduler(accountId);
+  }
+
+  function onCookieChanged(_e, cookie) {
+    if (!cfg.loginCookies.includes(cookie.name)) return;
+    handleLoginSuccess();
+  }
+
+  ses.cookies.on("changed", onCookieChanged);
+
+  win.webContents.on("did-navigate", (_e, url) => {
     if (!url.includes("login") && !url.includes("passport")) {
-      const ok = await checkLogin(accountId);
-      if (ok) {
-        account.isNew = false;
-        saveStore();
-        addLog(accountId, "登录成功！");
-        win.close();
-        sendLoginStatus(accountId, true);
-        startScheduler(accountId);
-      }
+      handleLoginSuccess();
     }
   });
 
   win.on("closed", async () => {
+    ses.cookies.removeListener("changed", onCookieChanged);
+    if (detected) return;
     const ok = await checkLogin(accountId);
     if (!ok && account.isNew) {
       // 新增账号未完成登录，自动删除
       stopScheduler(accountId);
-      const ses = session.fromPartition(getPartition(account));
       await ses.clearStorageData();
       const idx = store.accounts.findIndex((a) => a.id === accountId);
       if (idx !== -1) store.accounts.splice(idx, 1);
