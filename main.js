@@ -50,6 +50,7 @@ function emptyAccount(type) {
     lastRunResult: null,
     totalSaved: 0,
     totalSuccessCount: 0,
+    lastHeartbeatTime: null, // 仅 tb 使用：上次心跳续期时间
   };
 }
 
@@ -592,6 +593,49 @@ async function runJd(account, manual) {
 // ═══════════════════════════════════════════════════════════════
 // 淘宝专属：JSONP hook (tb-preload.js) + 坐标点击
 // ═══════════════════════════════════════════════════════════════
+
+// 登录心跳：cookie2 是会话主 cookie，长时间不访问登录态页面，
+// 服务端不会下发 Set-Cookie 滚动续签。这里定期无头打开「我的淘宝」，
+// 一来触发滚动续签，二来若 cookie2 已临期、havana_lgc 仍有效，
+// 淘宝会借此完成静默免密续登。
+const TB_HEARTBEAT_INTERVAL_HOURS = 12;
+const TB_HEARTBEAT_URL = "https://h5.m.taobao.com/mlapp/mytaobao.html";
+
+async function heartbeatTb(account) {
+  addLog(account.id, "执行登录心跳，刷新会话...");
+  const win = new BrowserWindow({
+    width: 375,
+    height: 812,
+    show: false,
+    webPreferences: {
+      partition: getPartition(account),
+    },
+  });
+  try {
+    const loaded = new Promise((resolve) => {
+      win.webContents.on("did-finish-load", () => resolve("loaded"));
+      win.webContents.on("did-fail-load", (_e, code, desc) =>
+        resolve(`failed:${desc || code}`)
+      );
+      setTimeout(() => resolve("timeout"), 15000);
+    });
+    win.loadURL(TB_HEARTBEAT_URL, { userAgent: MOBILE_UA });
+    const result = await loaded;
+    await delay(5000); // 等服务端 Set-Cookie 写回
+    if (result === "loaded") {
+      account.lastHeartbeatTime = new Date().toISOString();
+      saveStore();
+      addLog(account.id, "登录心跳完成");
+    } else {
+      addLog(account.id, `登录心跳未完成 (${result})`);
+    }
+  } catch (e) {
+    addLog(account.id, `登录心跳异常: ${e.message}`);
+  } finally {
+    if (!win.isDestroyed()) win.close();
+  }
+}
+
 function findByApiSuffix(responses, suffix) {
   const s = suffix.toLowerCase();
   for (let i = responses.length - 1; i >= 0; i--) {
@@ -882,6 +926,17 @@ async function runPlatform(accountId, manual = false) {
     stopScheduler(accountId);
     return;
   }
+
+  // 淘宝：每 12h 在跑业务前先做一次登录心跳，让服务端滚动续签 cookie2
+  if (account.type === "tb") {
+    const last = account.lastHeartbeatTime
+      ? new Date(account.lastHeartbeatTime).getTime()
+      : 0;
+    if (Date.now() - last > TB_HEARTBEAT_INTERVAL_HOURS * 3600000) {
+      await heartbeatTb(account);
+    }
+  }
+
   rt.isRunning = true;
   sendStatus();
   try {
