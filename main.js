@@ -387,7 +387,16 @@ function extractJdResults(responses) {
     r.body.includes("MOnceApplyResponse")
   );
 
-  for (const resp of priceResponses) {
+  if (DEBUG) {
+    addLog(null, `[DEBUG-JD] 找到 ${priceResponses.length} 个 MOnceApplyResponse`);
+  }
+
+  for (let i = 0; i < priceResponses.length; i++) {
+    const resp = priceResponses[i];
+    if (DEBUG) {
+      addLog(null, `[DEBUG-JD] --- 响应 #${i} URL: ${resp.url.slice(0, 120)}`);
+      addLog(null, `[DEBUG-JD] --- 响应 #${i} 原始 body (前2000字符): ${resp.body.slice(0, 2000)}`);
+    }
     let data;
     try {
       data = JSON.parse(resp.body);
@@ -396,36 +405,40 @@ function extractJdResults(responses) {
       if (m) {
         try {
           data = JSON.parse(m[1]);
+          if (DEBUG) addLog(null, `[DEBUG-JD] JSONP 解包成功`);
         } catch {}
       }
     }
-    if (!data || data.code !== 0) continue;
+    if (!data || data.code !== 0) {
+      if (DEBUG) addLog(null, `[DEBUG-JD] 跳过: data=${!!data}, code=${data?.code}`);
+      continue;
+    }
 
     const root = data.data || data;
+    if (DEBUG) {
+      addLog(null, `[DEBUG-JD] root 字段: ${JSON.stringify(root).slice(0, 2000)}`);
+    }
     const succNum = parseInt(root.succNum) || 0;
     const insuranceAmt = parseFloat(root.insuranceSuccAmount) || 0;
-    const onceAmt = parseFloat(root.onceSucAmount) || 0;
-    const amt = insuranceAmt + onceAmt;
+    const succAmt = parseFloat(root.succAmount) || 0;
+
+    if (DEBUG) {
+      addLog(null, `[DEBUG-JD] succNum=${root.succNum}→${succNum}, insuranceSuccAmount=${root.insuranceSuccAmount}→${insuranceAmt}, succAmount=${root.succAmount}→${succAmt}`);
+    }
 
     successCount += succNum;
-    totalAmount += amt;
+    totalAmount += succAmt + insuranceAmt;
 
     if (insuranceAmt > 0)
       details.push(`保险价保: ¥${insuranceAmt.toFixed(2)}`);
-    if (onceAmt > 0) details.push(`一键价保: ¥${onceAmt.toFixed(2)}`);
+    if (succAmt > 0) details.push(`一键价保: ¥${succAmt.toFixed(2)}`);
 
     const coupons = root.confirmCouponInfos;
-    if (Array.isArray(coupons)) {
-      for (const c of coupons) {
-        const d = parseFloat(c.discount) || 0;
-        if (d > 0) {
-          totalAmount += d;
-          details.push(`优惠券价保: ¥${d.toFixed(2)}`);
-        }
-      }
+    if (DEBUG) {
+      addLog(null, `[DEBUG-JD] confirmCouponInfos: ${JSON.stringify(coupons)}`);
     }
 
-    if (root.responseMessage && amt === 0) details.push(root.responseMessage);
+    if (root.responseMessage && succAmt + insuranceAmt === 0) details.push(root.responseMessage);
   }
 
   // 从首个统计 API 提取历史累计
