@@ -394,8 +394,8 @@ function extractJdResults(responses) {
   for (let i = 0; i < priceResponses.length; i++) {
     const resp = priceResponses[i];
     if (DEBUG) {
-      addLog(null, `[DEBUG-JD] --- 响应 #${i} URL: ${resp.url.slice(0, 120)}`);
-      addLog(null, `[DEBUG-JD] --- 响应 #${i} 原始 body (前2000字符): ${resp.body.slice(0, 2000)}`);
+      addLog(null, `[DEBUG-JD] --- 响应 #${i} URL: ${resp.url}`);
+      addLog(null, `[DEBUG-JD] --- 响应 #${i} 原始 body: ${resp.body}`);
     }
     let data;
     try {
@@ -416,7 +416,7 @@ function extractJdResults(responses) {
 
     const root = data.data || data;
     if (DEBUG) {
-      addLog(null, `[DEBUG-JD] root 字段: ${JSON.stringify(root).slice(0, 2000)}`);
+      addLog(null, `[DEBUG-JD] root 字段: ${JSON.stringify(root)}`);
     }
     const succNum = parseInt(root.succNum) || 0;
     const insuranceAmt = parseFloat(root.insuranceSuccAmount) || 0;
@@ -427,18 +427,16 @@ function extractJdResults(responses) {
     }
 
     successCount += succNum;
-    totalAmount += succAmt + insuranceAmt;
+    totalAmount += succAmt;
 
-    if (insuranceAmt > 0)
-      details.push(`保险价保: ¥${insuranceAmt.toFixed(2)}`);
-    if (succAmt > 0) details.push(`一键价保: ¥${succAmt.toFixed(2)}`);
+    if (succAmt > 0) details.push(`退款金额: ¥${succAmt.toFixed(2)}`);
 
     const coupons = root.confirmCouponInfos;
     if (DEBUG) {
       addLog(null, `[DEBUG-JD] confirmCouponInfos: ${JSON.stringify(coupons)}`);
     }
 
-    if (root.responseMessage && succAmt + insuranceAmt === 0) details.push(root.responseMessage);
+    if (root.responseMessage && succAmt === 0) details.push(root.responseMessage);
   }
 
   // 从首个统计 API 提取历史累计
@@ -561,7 +559,7 @@ async function runJd(account, manual) {
       for (const r of responses) {
         addLog(
           account.id,
-          `[DEBUG] ${r.url.slice(0, 80)}: ${r.body.slice(0, 500)}`
+          `[DEBUG] ${r.url}: ${r.body}`
         );
       }
     }
@@ -669,7 +667,7 @@ function extractTbResults(responses, accountId) {
     for (const r of responses) {
       addLog(
         accountId,
-        `[DEBUG] ${r.api} (${r.via}): ${JSON.stringify(r.data?.data?.model || r.data?.model || r.data).slice(0, 200)}`
+        `[DEBUG] ${r.api} (${r.via}): ${JSON.stringify(r.data?.data?.model || r.data?.model || r.data)}`
       );
     }
   }
