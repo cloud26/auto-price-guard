@@ -24,6 +24,156 @@ const state = {
   updateState: "idle",
 };
 
+// ── Chart ──
+const chartCanvas = $("historyChart");
+const chartEmpty = $("chartEmpty");
+const chartLabelEl = $("chartLabel");
+let historyChart = null;
+let chartDays = 30;
+
+const CHART_PALETTE = [
+  { bg: "rgba(99, 152, 214, 0.5)",  border: "rgba(99, 152, 214, 0.8)" },
+  { bg: "rgba(240, 170, 100, 0.5)", border: "rgba(240, 170, 100, 0.8)" },
+  { bg: "rgba(130, 190, 140, 0.5)", border: "rgba(130, 190, 140, 0.8)" },
+  { bg: "rgba(190, 130, 180, 0.5)", border: "rgba(190, 130, 180, 0.8)" },
+  { bg: "rgba(220, 150, 130, 0.5)", border: "rgba(220, 150, 130, 0.8)" },
+  { bg: "rgba(110, 190, 200, 0.5)", border: "rgba(110, 190, 200, 0.8)" },
+  { bg: "rgba(180, 180, 120, 0.5)", border: "rgba(180, 180, 120, 0.8)" },
+  { bg: "rgba(160, 140, 210, 0.5)", border: "rgba(160, 140, 210, 0.8)" },
+];
+
+function renderChart(dailyHistory, accountList) {
+  const container = chartCanvas.parentElement;
+  chartLabelEl.textContent = `${chartDays}天累计省钱`;
+
+  const dates = [];
+  const today = new Date();
+  for (let i = chartDays - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    dates.push(d.toLocaleDateString("sv-SE"));
+  }
+
+  const cutoff = dates[0];
+  const filtered = (dailyHistory || []).filter((e) => e.date >= cutoff);
+
+  // Update summary
+  let rangeTotal = 0;
+  let rangeCount = 0;
+  for (const e of filtered) {
+    rangeTotal += e.amount;
+    rangeCount++;
+  }
+  const intPart = Math.floor(rangeTotal);
+  const decPart = (rangeTotal - intPart).toFixed(2).slice(1);
+  heroIntEl.textContent = intPart.toLocaleString();
+  heroDecEl.textContent = decPart;
+  heroCountEl.textContent = rangeCount;
+
+  if (filtered.length === 0) {
+    container.style.display = "none";
+    chartEmpty.style.display = "";
+    return;
+  }
+  container.style.display = "";
+  chartEmpty.style.display = "none";
+
+  const byAccount = {};
+  for (const entry of filtered) {
+    if (!byAccount[entry.accountId]) byAccount[entry.accountId] = {};
+    const bucket = byAccount[entry.accountId];
+    bucket[entry.date] = (bucket[entry.date] || 0) + entry.amount;
+  }
+
+  const datasets = Object.keys(byAccount).map((accountId, idx) => {
+    const account = accountList.find((a) => a.id === accountId);
+    const type = account?.type || (accountId.startsWith("tb") ? "tb" : "jd");
+    const label = account
+      ? `${PLATFORM_NAMES[type]}${account.nickname ? "·" + account.nickname : ""}`
+      : accountId;
+    const color = CHART_PALETTE[idx % CHART_PALETTE.length];
+
+    return {
+      label,
+      data: dates.map((d) => byAccount[accountId][d] || 0),
+      backgroundColor: color.bg,
+      borderColor: color.border,
+      borderWidth: 1,
+      borderRadius: 3,
+    };
+  });
+
+  const labels = dates.map((d) => d.slice(5));
+
+  if (historyChart) {
+    historyChart.data.labels = labels;
+    historyChart.data.datasets = datasets;
+    historyChart.update("none");
+  } else {
+    historyChart = new Chart(chartCanvas, {
+      type: "bar",
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: {
+            stacked: true,
+            grid: { display: false },
+            ticks: {
+              font: { size: 10 },
+              color: "rgba(29,29,31,0.38)",
+              maxRotation: 0,
+              autoSkip: true,
+              maxTicksLimit: 10,
+            },
+            border: { display: false },
+          },
+          y: {
+            stacked: true,
+            grid: { color: "rgba(0,0,0,0.04)" },
+            ticks: {
+              font: { size: 10 },
+              color: "rgba(29,29,31,0.38)",
+              callback: (v) => "¥" + v,
+            },
+            border: { display: false },
+            beginAtZero: true,
+          },
+        },
+        plugins: {
+          legend: {
+            display: datasets.length > 1,
+            position: "bottom",
+            labels: {
+              boxWidth: 8,
+              boxHeight: 8,
+              font: { size: 11 },
+              color: "rgba(29,29,31,0.56)",
+              padding: 12,
+            },
+          },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => `${ctx.dataset.label}: ¥${ctx.raw.toFixed(2)}`,
+            },
+          },
+        },
+        interaction: { mode: "index", intersect: false },
+      },
+    });
+  }
+}
+
+for (const btn of document.querySelectorAll(".chart-range-btn")) {
+  btn.onclick = () => {
+    document.querySelector(".chart-range-btn.active")?.classList.remove("active");
+    btn.classList.add("active");
+    chartDays = parseInt(btn.dataset.days);
+    if (state.last) renderChart(state.last.dailyHistory, state.last.accounts);
+  };
+}
+
 const pad = (n) => String(n).padStart(2, "0");
 
 function formatDateTime(iso) {
@@ -191,14 +341,6 @@ function removeAccountCard(accountId) {
 }
 
 // ── Render ──
-function renderHero(totals) {
-  const amount = totals?.saved || 0;
-  const [intPart, decPart] = amount.toFixed(2).split(".");
-  heroIntEl.textContent = Number(intPart).toLocaleString("en-US");
-  heroDecEl.textContent = "." + decPart;
-  heroCountEl.textContent = totals?.count || 0;
-}
-
 function renderAccount(accountId, data) {
   const refs = ui.get(accountId);
   if (!refs) return;
@@ -273,7 +415,6 @@ function renderAccount(accountId, data) {
 
 function updateStatus(status) {
   state.last = status;
-  renderHero(status.totals);
 
   const newIds = new Set(status.accounts.map((a) => a.id));
   const oldIds = new Set(accounts.map((a) => a.id));
@@ -295,6 +436,7 @@ function updateStatus(status) {
   }
 
   if (status.appVersion) appVersionEl.textContent = `v${status.appVersion}`;
+  renderChart(status.dailyHistory, status.accounts);
 }
 
 function setLoginStatus(accountId, loggedIn) {

@@ -128,17 +128,20 @@
     .dot.accent  .inner, .dot.accent  .pulse { background: var(--accent); }
     .dot.muted   .inner, .dot.muted   .pulse { background: var(--text-subtle); }
 
-    /* ── Hero: total savings ── */
-    .hero-wrap { padding: 14px 32px 8px; flex-shrink: 0; }
-    .hero {
+    /* ── Chart section ── */
+    .chart-wrap {
+      padding: 14px 32px 8px;
+      flex-shrink: 0;
+    }
+    .chart-section {
       position: relative;
       background: var(--surface);
       border-radius: 16px;
-      padding: 16px 24px 16px;
       border: 1px solid var(--line);
+      padding: 16px 20px;
       overflow: hidden;
     }
-    .hero::before {
+    .chart-section::before {
       content: '';
       position: absolute;
       top: -60px; right: -60px;
@@ -146,35 +149,81 @@
       background: radial-gradient(circle, var(--accent-soft) 0%, transparent 70%);
       pointer-events: none;
     }
-    .hero-label {
+    .chart-head {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 14px;
+      position: relative;
+    }
+    .chart-summary {
+      flex: 1;
+    }
+    .chart-label {
       font-size: 12px;
       color: var(--text-muted);
       letter-spacing: 0.3px;
       text-transform: uppercase;
-      margin-bottom: 6px;
-      position: relative;
+      margin-bottom: 4px;
     }
-    .hero-amount {
+    .chart-amount {
       font-family: var(--font-display);
-      font-size: 52px;
+      font-size: 38px;
       font-weight: 300;
-      letter-spacing: -1.5px;
+      letter-spacing: -1px;
       line-height: 1;
       color: var(--accent);
       display: flex;
       align-items: baseline;
-      gap: 4px;
-      position: relative;
+      gap: 3px;
     }
-    .hero-amount .sym { font-size: 30px; font-weight: 400; opacity: 0.8; }
-    .hero-amount .dec { font-size: 26px; font-weight: 300; opacity: 0.55; }
-    .hero-meta {
-      margin-top: 6px;
-      font-size: 13px;
+    .chart-amount .sym { font-size: 22px; font-weight: 400; opacity: 0.8; }
+    .chart-amount .dec { font-size: 20px; font-weight: 300; opacity: 0.55; }
+    .chart-meta {
+      margin-top: 4px;
+      font-size: 12px;
       color: var(--text-muted);
-      position: relative;
     }
-    .hero-meta strong { color: var(--text); font-weight: 500; }
+    .chart-meta strong { color: var(--text); font-weight: 500; }
+    .chart-controls {
+      display: flex;
+      gap: 4px;
+      background: var(--surface-inset);
+      border-radius: 8px;
+      padding: 2px;
+    }
+    .chart-range-btn {
+      background: none;
+      border: none;
+      font-family: inherit;
+      font-size: 11px;
+      color: var(--text-muted);
+      padding: 4px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .chart-range-btn.active {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    }
+    .chart-range-btn:hover:not(.active) {
+      color: var(--text);
+    }
+    .chart-container {
+      position: relative;
+      height: 160px;
+    }
+    .chart-container canvas {
+      width: 100% !important;
+      height: 100% !important;
+    }
+    .chart-empty {
+      text-align: center;
+      padding: 32px 0;
+      font-size: 13px;
+      color: var(--text-subtle);
+    }
 
     /* ── Account list (scrollable) ── */
     .account-scroll {
@@ -557,15 +606,29 @@
     <button class="btn-update" id="updateBtn">下载更新</button>
   </div>
 
-  <!-- Hero: total savings -->
-  <div class="hero-wrap">
-    <div class="hero">
-      <div class="hero-label">累计省钱</div>
-      <div class="hero-amount jd-num">
-        <span class="sym">¥</span><span id="heroInt">0</span><span class="dec" id="heroDec">.00</span>
+  <!-- Chart + summary -->
+  <div class="chart-wrap">
+    <div class="chart-section">
+      <div class="chart-head">
+        <div class="chart-summary">
+          <div class="chart-label" id="chartLabel">30天累计省钱</div>
+          <div class="chart-amount jd-num">
+            <span class="sym">¥</span><span id="heroInt">0</span><span class="dec" id="heroDec">.00</span>
+          </div>
+          <div class="chart-meta">
+            <strong class="jd-num" id="heroCount">0</strong> 件商品成功退款
+          </div>
+        </div>
+        <div class="chart-controls">
+          <button class="chart-range-btn" data-days="14">14天</button>
+          <button class="chart-range-btn active" data-days="30">30天</button>
+        </div>
       </div>
-      <div class="hero-meta">
-        <strong class="jd-num" id="heroCount">0</strong> 件商品成功退款
+      <div class="chart-container">
+        <canvas id="historyChart"></canvas>
+      </div>
+      <div class="chart-empty" id="chartEmpty" style="display:none">
+        暂无价保记录
       </div>
     </div>
   </div>
@@ -611,6 +674,7 @@
 
   <div class="footer">关闭窗口后将在菜单栏继续运行 · <span id="appVersion"></span></div>
 
+  <script src="chart.umd.js"></script>
   <script src="renderer.js"></script>
 </body>
 </html>

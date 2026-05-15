@@ -83,17 +83,18 @@ function loadStore() {
         { ...emptyAccount("jd"), id: "jd_1" },
         { ...emptyAccount("tb"), id: "tb_1" },
       ],
+      dailyHistory: [],
     };
   }
 
   // 新格式
   if (raw.accounts) {
-    // 确保每个账号都有完整字段
     return {
       accounts: raw.accounts.map((a) => ({
         ...emptyAccount(a.type),
         ...a,
       })),
+      dailyHistory: raw.dailyHistory || [],
     };
   }
 
@@ -106,7 +107,7 @@ function loadStore() {
     if (raw.tb) {
       accounts.push({ ...emptyAccount("tb"), ...raw.tb, id: "tb_1", partition: "persist:tb" });
     }
-    return { accounts };
+    return { accounts, dailyHistory: [] };
   }
 
   // 更旧的扁平格式（v1.0 之前）
@@ -124,6 +125,7 @@ function loadStore() {
       },
       { ...emptyAccount("tb"), id: "tb_1", partition: "persist:tb" },
     ],
+    dailyHistory: [],
   };
 }
 
@@ -131,7 +133,24 @@ function saveStore() {
   fs.writeFileSync(STORE_PATH, JSON.stringify(store, null, 2));
 }
 
+function recordDailyHistory(accountId, amount) {
+  if (!store.dailyHistory) store.dailyHistory = [];
+  const today = new Date().toLocaleDateString("sv-SE");
+  store.dailyHistory.push({ date: today, accountId, amount });
+  pruneHistory();
+  saveStore();
+}
+
+function pruneHistory() {
+  if (!store.dailyHistory) return;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 90);
+  const cutoffStr = cutoff.toLocaleDateString("sv-SE");
+  store.dailyHistory = store.dailyHistory.filter((e) => e.date >= cutoffStr);
+}
+
 let store = loadStore();
+
 
 function getAccount(accountId) {
   return store.accounts.find((a) => a.id === accountId);
@@ -220,6 +239,7 @@ function buildStatus() {
   return {
     accounts: accountStatuses,
     totals: { saved: totalSaved, count: totalCount },
+    dailyHistory: store.dailyHistory || [],
     appVersion: app.getVersion(),
   };
 }
@@ -578,6 +598,7 @@ async function runJd(account, manual) {
         body: `${displayName} 价保成功！退款 ¥${result.totalAmount.toFixed(2)}`,
       }).show();
       account.lastRunResult = `成功 ¥${result.totalAmount.toFixed(2)}`;
+      recordDailyHistory(account.id, result.totalAmount);
     } else if (result.hasApi) {
       addLog(account.id, "价保已申请，本次无退款");
       account.lastRunResult = clicked ? "已申请(无退款)" : "无可申请订单";
@@ -896,6 +917,7 @@ async function runTb(account, manual) {
         body: `${displayName} 价保成功！退款 ¥${result.totalAmount.toFixed(2)}`,
       }).show();
       account.lastRunResult = `成功 ¥${result.totalAmount.toFixed(2)}`;
+      recordDailyHistory(account.id, result.totalAmount);
     } else {
       addLog(account.id, "本次无退款");
       account.lastRunResult = clicked ? "已申请(无退款)" : "无可申请订单";
@@ -1050,6 +1072,7 @@ ipcMain.handle("remove-account", async (_e, accountId) => {
   const ses = session.fromPartition(getPartition(account));
   await ses.clearStorageData();
   store.accounts.splice(idx, 1);
+  store.dailyHistory = (store.dailyHistory || []).filter((e) => e.accountId !== accountId);
   runtime.delete(accountId);
   saveStore();
   addLog(null, `已删除账号 ${account.nickname || PLATFORMS[account.type].name}`);

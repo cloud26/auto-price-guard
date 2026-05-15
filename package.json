@@ -1,6 +1,6 @@
 {
   "name": "auto-price-guard",
-  "version": "1.2.2",
+  "version": "1.3.0",
   "description": "京东 / 淘宝价格保护自动申请工具",
   "main": "main.js",
   "scripts": {
@@ -12,6 +12,7 @@
     "release": "bash -c 'set -a && source .env.local && set +a && electron-builder --mac --publish always'"
   },
   "dependencies": {
+    "chart.js": "^4.5.1",
     "electron-updater": "^6.8.3"
   },
   "devDependencies": {
@@ -46,7 +47,8 @@
       "jd-preload.js",
       "tb-preload.js",
       "index.html",
-      "renderer.js"
+      "renderer.js",
+      "chart.umd.js"
     ],
     "publish": [
       {
