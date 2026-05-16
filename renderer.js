@@ -185,7 +185,8 @@ function formatDateTime(iso) {
 function formatRelative(iso) {
   if (!iso) return null;
   const diff = new Date(iso) - Date.now();
-  if (diff < 60000) return "即将执行";
+  if (diff <= 0) return "等待中";
+  if (diff < 60000) return "< 1 分钟";
   const mins = Math.round(diff / 60000);
   if (mins < 60) return `${mins} 分钟后`;
   const hours = Math.floor(mins / 60);

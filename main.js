@@ -977,6 +977,7 @@ async function runPlatform(accountId, manual = false) {
     else await runTb(account, manual);
   } finally {
     rt.isRunning = false;
+    if (rt.timer) startScheduler(accountId);
     sendStatus();
   }
 }
@@ -1012,7 +1013,11 @@ ipcMain.on("renderer-ready", () => {
 ipcMain.handle("check-login", async (_e, accountId) => {
   const ok = await checkLogin(accountId);
   const rt = runtime.get(accountId);
-  if (ok && rt && !rt.timer) startScheduler(accountId);
+  if (ok && rt && !rt.timer) {
+    startScheduler(accountId);
+    const account = getAccount(accountId);
+    if (account && !account.lastRunTime) enqueueRun(accountId);
+  }
   return ok;
 });
 
