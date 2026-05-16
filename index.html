@@ -238,194 +238,178 @@
       border-radius: 3px;
     }
 
-    .account-list {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    /* ── Platform card ── */
-    .platform {
+    /* ── Account table ── */
+    .account-table {
       background: var(--surface);
       border-radius: 14px;
       border: 1px solid var(--line);
-      padding: 16px 18px;
+      overflow: hidden;
     }
-    .platform-head {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      margin-bottom: 10px;
+    .account-table .table-head {
+      display: grid;
+      grid-template-columns: 2fr 1fr 2fr 1.2fr 1fr 1fr;
+      column-gap: 12px;
+      padding: 8px 16px;
+      border-bottom: 1px solid var(--line);
     }
-    .platform-name {
-      font-size: 14px;
-      font-weight: 600;
-      letter-spacing: -0.1px;
-    }
-    .platform-name.jd { color: var(--jd-color); }
-    .platform-name.tb { color: var(--tb-color); }
-    .platform-nickname {
-      font-size: 13px;
-      color: var(--text);
-      font-weight: 500;
-    }
-
-    .btn-remove {
-      margin-left: 4px;
-      background: none;
-      border: none;
+    .account-table .th {
+      font-size: 11px;
       color: var(--text-subtle);
-      font-size: 16px;
-      cursor: pointer;
-      padding: 2px 6px;
-      border-radius: 6px;
-      line-height: 1;
-      transition: background 0.15s, color 0.15s;
+      font-weight: 400;
     }
-    .btn-remove:hover {
-      background: rgba(224, 67, 59, 0.08);
-      color: var(--danger);
+    .account-table .th:last-child { text-align: center; }
+    .account-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr 2fr 1.2fr 1fr 1fr;
+      column-gap: 12px;
+      padding: 14px 16px;
+      align-items: center;
+      border-bottom: 1px solid var(--line);
+      position: relative;
     }
-
-    .login-pill {
+    .account-row:last-child { border-bottom: none; }
+    .account-row.running::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 16px; right: 16px;
+      height: 2px;
+      background: var(--surface-inset);
+      border-radius: 1px;
+    }
+    .account-row.running::before {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 16px;
+      width: 33%; height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      animation: jd-sweep 1.8s linear infinite;
+      z-index: 1;
+    }
+    .row-name {
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 3px 10px;
-      border-radius: 999px;
+      gap: 8px;
+      min-width: 0;
+    }
+    .row-name .platform-tag {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 5px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .row-name .platform-tag.jd { color: var(--jd-color); background: rgba(224,59,59,0.08); }
+    .row-name .platform-tag.tb { color: var(--tb-color); background: rgba(255,106,0,0.08); }
+    .row-nickname {
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--text);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .row-login {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11px;
+      color: var(--text-subtle);
+      cursor: pointer;
       background: var(--surface-2);
       border: 1px solid var(--line);
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-left: auto;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-family: inherit;
+      transition: background 0.15s, color 0.15s;
+      flex-shrink: 0;
     }
-    .login-pill.logged-in {
+    .row-login:hover { color: var(--text); background: var(--surface-inset); }
+    .row-login.logged-in {
       background: rgba(47, 168, 92, 0.08);
       border-color: rgba(47, 168, 92, 0.2);
       color: var(--success);
     }
-    .login-pill .pill-dot {
-      display: none;
-      width: 6px;
-      height: 6px;
+    .row-login.logged-in:hover { color: var(--text-muted); background: var(--surface-2); }
+    .row-login .login-dot {
+      width: 5px;
+      height: 5px;
       border-radius: 50%;
-      background: var(--success);
       flex-shrink: 0;
     }
-    .login-pill.logged-in .pill-dot { display: block; }
-    .login-pill .action {
-      color: var(--text-subtle);
-      cursor: pointer;
-      background: none;
-      border: none;
-      padding: 0;
-      font-size: inherit;
-      font-family: inherit;
-      margin-left: 2px;
+    .row-login.logged-in .login-dot { background: var(--success); }
+    .row-login.needs-login {
+      color: var(--accent);
+      border-color: rgba(224, 59, 59, 0.2);
+      background: rgba(224, 59, 59, 0.05);
     }
-    .login-pill .action::before {
-      content: '\00b7';
-      margin-right: 4px;
-      color: inherit;
-      opacity: 0.5;
-    }
-    .login-pill .action:hover { color: var(--text); }
-    .login-pill .action.primary { color: var(--accent); }
-
-    .platform-stats {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 16px;
-      margin-bottom: 10px;
-    }
-    .stat-label { font-size: 11px; color: var(--text-muted); margin-bottom: 3px; }
-    .stat-value {
-      font-size: 14px;
-      font-weight: 500;
-      letter-spacing: -0.1px;
+    .row-login.needs-login:hover { background: rgba(224, 59, 59, 0.1); }
+    .row-cell {
+      font-size: 12px;
       color: var(--text);
+      min-width: 0;
     }
-    .stat-value.pending { color: var(--text-muted); font-weight: 400; }
-    .stat-value.success { color: var(--success); }
-    .stat-value.danger { color: var(--danger); }
-    .stat-meta { font-size: 11px; color: var(--text-subtle); margin-top: 2px; }
-
-    .platform-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
+    .row-cell .sub {
+      font-size: 11px;
+      color: var(--text-subtle);
+      margin-top: 1px;
     }
-    .interval {
-      flex: 1;
-      background: var(--surface-2);
-      border-radius: 10px;
-      border: 1px solid var(--line);
-      padding: 8px 12px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12.5px;
-      color: var(--text-muted);
-    }
-    .interval select {
+    .row-cell.muted { color: var(--text-muted); }
+    .row-cell.success-text { color: var(--success); }
+    .row-cell.danger-text { color: var(--danger); }
+    .row-cell select {
       background: transparent;
       border: none;
       color: var(--text);
-      font-size: 12.5px;
+      font-size: 12px;
       font-family: inherit;
       cursor: pointer;
       outline: none;
-      margin-left: auto;
-      text-align: right;
+      -webkit-appearance: none;
+      padding-right: 12px;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%231D1D1F' fill-opacity='0.35'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right center;
     }
-    .btn-run {
-      padding: 0 18px;
-      height: 34px;
+    .row-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .btn-row-run {
+      padding: 4px 10px;
       background: var(--accent);
       color: #fff;
       border: none;
-      border-radius: 10px;
-      font-size: 12.5px;
+      border-radius: 6px;
+      font-size: 11px;
       font-weight: 500;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      transition: opacity 0.15s, transform 0.05s;
-      flex-shrink: 0;
+      transition: opacity 0.15s;
+      white-space: nowrap;
     }
-    .btn-run:hover:not(:disabled) { opacity: 0.9; }
-    .btn-run:active:not(:disabled) { transform: scale(0.98); }
-    .btn-run:disabled {
-      background: var(--surface);
+    .btn-row-run:hover:not(:disabled) { opacity: 0.85; }
+    .btn-row-run:disabled {
+      background: var(--surface-inset);
       color: var(--text-subtle);
-      border: 1px solid var(--line-strong);
       cursor: not-allowed;
     }
-    .btn-run.loading {
-      background: var(--surface);
-      color: var(--text);
-      border: 1px solid var(--line-strong);
-    }
-
-    .progress-strip {
-      display: none;
-      margin-top: 10px;
-      height: 3px;
+    .btn-row-run.loading {
       background: var(--surface-inset);
-      border-radius: 2px;
-      overflow: hidden;
-      position: relative;
+      color: var(--text-muted);
     }
-    .progress-strip.show { display: block; }
-    .progress-strip::after {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; bottom: 0;
-      width: 33%;
-      background: linear-gradient(90deg, transparent, var(--accent), transparent);
-      animation: jd-sweep 1.8s linear infinite;
+    .btn-row-remove {
+      background: none;
+      border: none;
+      color: var(--text-subtle);
+      font-size: 14px;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 4px;
+      line-height: 1;
+      transition: color 0.15s;
     }
+    .btn-row-remove:hover { color: var(--danger); }
 
     /* ── Add account ── */
     .add-account-bar {
@@ -633,9 +617,19 @@
     </div>
   </div>
 
-  <!-- Accounts (dynamic, scrollable) -->
+  <!-- Accounts (table) -->
   <div class="account-scroll">
-    <div class="account-list" id="accountList"></div>
+    <div class="account-table">
+      <div class="table-head">
+        <div class="th">账号</div>
+        <div class="th">状态</div>
+        <div class="th">上次结果</div>
+        <div class="th">下次运行</div>
+        <div class="th">间隔</div>
+        <div class="th">操作</div>
+      </div>
+      <div id="accountList"></div>
+    </div>
     <div class="add-account-bar">
       <button class="btn-add" id="addAccountBtn">+ 添加账号</button>
     </div>

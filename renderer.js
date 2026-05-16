@@ -211,17 +211,17 @@ function setDot(el, kind, pulsing) {
   el.className = `dot ${kind}${pulsing ? " pulsing" : ""}`;
 }
 
-// ── Dynamic card creation ──
+// ── Dynamic row creation ──
 function createIntervalSelect(accountId, currentHours) {
   const options = [
-    { value: "0.5", label: "30 分钟" },
-    { value: "1", label: "1 小时" },
-    { value: "2", label: "2 小时" },
-    { value: "4", label: "4 小时" },
-    { value: "6", label: "6 小时" },
-    { value: "8", label: "8 小时" },
-    { value: "12", label: "12 小时" },
-    { value: "24", label: "24 小时" },
+    { value: "0.5", label: "30分钟" },
+    { value: "1", label: "1小时" },
+    { value: "2", label: "2小时" },
+    { value: "4", label: "4小时" },
+    { value: "6", label: "6小时" },
+    { value: "8", label: "8小时" },
+    { value: "12", label: "12小时" },
+    { value: "24", label: "24小时" },
   ];
   const select = document.createElement("select");
   for (const opt of options) {
@@ -241,82 +241,40 @@ function createAccountCard(account) {
   const colorClass = PLATFORM_COLORS[type] || "jd";
   const platformName = PLATFORM_NAMES[type] || type;
 
-  const card = document.createElement("div");
-  card.className = "platform";
-  card.dataset.accountId = account.id;
+  const row = document.createElement("div");
+  row.className = "account-row";
+  row.dataset.accountId = account.id;
 
-  card.innerHTML = `
-    <div class="platform-head">
-      <span class="dot muted"><span class="pulse"></span><span class="inner"></span></span>
-      <span class="platform-name ${colorClass}">${platformName}</span>
-      <span class="platform-nickname"></span>
-      <span class="login-pill">
-        <span class="pill-dot"></span>
-        <span class="login-text">检测中…</span>
-        <button class="action" style="display:none"></button>
-      </span>
-      <button class="btn-remove" title="删除账号">×</button>
+  row.innerHTML = `
+    <div class="row-name">
+      <span class="platform-tag ${colorClass}">${platformName}</span>
+      <span class="row-nickname"></span>
     </div>
-    <div class="platform-stats">
-      <div>
-        <div class="stat-label">累计</div>
-        <div class="stat-value jd-num saved">¥0.00</div>
-        <div class="stat-meta jd-num saved-meta">0 件</div>
-      </div>
-      <div>
-        <div class="stat-label">上次运行</div>
-        <div class="stat-value pending last-run">--</div>
-        <div class="stat-meta last-result"></div>
-      </div>
-      <div>
-        <div class="stat-label">下次运行</div>
-        <div class="stat-value pending next-run">--</div>
-        <div class="stat-meta next-run-meta"></div>
-      </div>
+    <div class="row-cell status-cell"><button class="row-login">…</button></div>
+    <div class="row-cell last-result-cell muted">--</div>
+    <div class="row-cell next-run-cell muted">--</div>
+    <div class="row-cell interval-cell"></div>
+    <div class="row-actions">
+      <button class="btn-row-run">执行</button>
+      <button class="btn-row-remove" title="删除">×</button>
     </div>
-    <div class="platform-actions">
-      <div class="interval">
-        <span>每</span>
-        <span class="interval-select-wrap"></span>
-        <span>执行一次</span>
-      </div>
-      <button class="btn-run">
-        <span class="run-btn-text">立即执行</span>
-      </button>
-    </div>
-    <div class="progress-strip"></div>
   `;
 
-  // Insert interval select
-  const selectWrap = card.querySelector(".interval-select-wrap");
-  const intervalSelect = createIntervalSelect(
-    account.id,
-    account.intervalHours || 2
-  );
-  selectWrap.appendChild(intervalSelect);
+  const intervalCell = row.querySelector(".interval-cell");
+  const intervalSelect = createIntervalSelect(account.id, account.intervalHours || 2);
+  intervalCell.appendChild(intervalSelect);
 
-  // Gather refs
   const refs = {
-    card,
-    dot: card.querySelector(".dot"),
-    platformNickname: card.querySelector(".platform-nickname"),
-    loginPill: card.querySelector(".login-pill"),
-    loginText: card.querySelector(".login-text"),
-    loginAction: card.querySelector(".login-pill .action"),
-    saved: card.querySelector(".saved"),
-    savedMeta: card.querySelector(".saved-meta"),
-    lastRun: card.querySelector(".last-run"),
-    lastResult: card.querySelector(".last-result"),
-    nextRun: card.querySelector(".next-run"),
-    nextRunMeta: card.querySelector(".next-run-meta"),
-    runBtn: card.querySelector(".btn-run"),
-    runBtnText: card.querySelector(".run-btn-text"),
-    progress: card.querySelector(".progress-strip"),
+    card: row,
+    nickname: row.querySelector(".row-nickname"),
+    loginBtn: row.querySelector(".row-login"),
+    lastResultCell: row.querySelector(".last-result-cell"),
+    nextRunCell: row.querySelector(".next-run-cell"),
+    runBtn: row.querySelector(".btn-row-run"),
+    removeBtn: row.querySelector(".btn-row-remove"),
     intervalSelect,
-    removeBtn: card.querySelector(".btn-remove"),
   };
 
-  // Event bindings
   refs.runBtn.onclick = () => window.api.runNow(account.id);
   refs.removeBtn.onclick = () => {
     if (confirm(`确定删除此${platformName}账号吗？`)) {
@@ -324,10 +282,9 @@ function createAccountCard(account) {
     }
   };
 
-  accountListEl.appendChild(card);
+  accountListEl.appendChild(row);
   ui.set(account.id, refs);
   state.loginStatus.set(account.id, false);
-
   return refs;
 }
 
@@ -345,69 +302,41 @@ function renderAccount(accountId, data) {
   const refs = ui.get(accountId);
   if (!refs) return;
   const running = !!data.isRunning;
-  const scheduled = !!data.schedulerRunning;
   const loggedIn = state.loginStatus.get(accountId) || false;
 
-  // Nickname
-  refs.platformNickname.textContent = data.nickname ? `· ${data.nickname}` : "";
+  refs.nickname.textContent = data.nickname || data.id;
+  refs.card.classList.toggle("running", running);
 
-  // Dot status
-  if (running) setDot(refs.dot, "accent", true);
-  else if (loggedIn && scheduled) setDot(refs.dot, "success", false);
-  else if (loggedIn) setDot(refs.dot, "warning", false);
-  else setDot(refs.dot, "muted", false);
-
-  // Progress strip
-  refs.progress.classList.toggle("show", running);
-
-  // Saved
-  refs.saved.textContent = `¥${(data.totalSaved || 0).toFixed(2)}`;
-  refs.savedMeta.textContent = `${data.totalSuccessCount || 0} 件`;
-
-  // Last run
-  const lastStr = formatDateTime(data.lastRunTime);
-  refs.lastRun.textContent = lastStr || "--";
-  refs.lastRun.classList.toggle("pending", !lastStr);
+  // Last result
   if (data.lastRunResult) {
     const raw = data.lastRunResult;
     const ok = raw.startsWith("成功");
     const err = raw.startsWith("出错");
-    refs.lastResult.textContent = ok
-      ? raw.replace(/^成功\s*/, "")
-      : raw.length > 14
-      ? raw.slice(0, 14) + "…"
-      : raw;
-    refs.lastResult.className = "stat-meta";
-    if (ok) refs.lastResult.style.color = "var(--success)";
-    else if (err) refs.lastResult.style.color = "var(--danger)";
-    else refs.lastResult.style.color = "";
+    refs.lastResultCell.textContent = raw.length > 16 ? raw.slice(0, 16) + "…" : raw;
+    refs.lastResultCell.className = "row-cell";
+    if (ok) refs.lastResultCell.classList.add("success-text");
+    else if (err) refs.lastResultCell.classList.add("danger-text");
   } else {
-    refs.lastResult.textContent = data.lastRunTime
-      ? formatPast(data.lastRunTime)
-      : "";
-    refs.lastResult.style.color = "";
+    refs.lastResultCell.textContent = "--";
+    refs.lastResultCell.className = "row-cell muted";
   }
 
   // Next run
   const nextRel = formatRelative(data.nextRunTime);
-  refs.nextRun.textContent = nextRel || "--";
-  refs.nextRun.classList.toggle("pending", !nextRel);
-  refs.nextRunMeta.textContent = data.nextRunTime
-    ? formatDateTime(data.nextRunTime)
-    : "";
+  refs.nextRunCell.textContent = nextRel || "--";
+  refs.nextRunCell.className = nextRel ? "row-cell" : "row-cell muted";
 
   // Run button
   if (running) {
     refs.runBtn.disabled = true;
     refs.runBtn.classList.add("loading");
-    refs.runBtnText.textContent = "运行中…";
+    refs.runBtn.textContent = "运行中";
   } else {
     refs.runBtn.disabled = !loggedIn;
     refs.runBtn.classList.remove("loading");
-    refs.runBtnText.textContent = "立即执行";
+    refs.runBtn.textContent = "执行";
   }
 
-  // Interval select
   if (data.intervalHours != null) {
     refs.intervalSelect.value = String(data.intervalHours);
   }
@@ -443,26 +372,16 @@ function setLoginStatus(accountId, loggedIn) {
   state.loginStatus.set(accountId, loggedIn);
   const refs = ui.get(accountId);
   if (!refs) return;
-  const account = accounts.find((a) => a.id === accountId);
-  const name = account
-    ? PLATFORM_NAMES[account.type] || account.type
-    : "";
 
-  refs.loginPill.classList.toggle("logged-in", loggedIn);
   if (loggedIn) {
-    refs.loginText.textContent = `已登录`;
-    refs.loginAction.style.display = "";
-    refs.loginAction.textContent = "退出";
-    refs.loginAction.classList.remove("primary");
-    refs.loginAction.onclick = () => window.api.logout(accountId);
+    refs.loginBtn.innerHTML = `<span class="login-dot"></span>退出`;
+    refs.loginBtn.className = "row-login logged-in";
+    refs.loginBtn.onclick = () => window.api.logout(accountId);
   } else {
-    refs.loginText.textContent = "未登录";
-    refs.loginAction.style.display = "";
-    refs.loginAction.textContent = "去登录";
-    refs.loginAction.classList.add("primary");
-    refs.loginAction.onclick = () => window.api.openLogin(accountId);
+    refs.loginBtn.innerHTML = `去登录`;
+    refs.loginBtn.className = "row-login needs-login";
+    refs.loginBtn.onclick = () => window.api.openLogin(accountId);
   }
-  // Re-render to update button state
   const data = accounts.find((a) => a.id === accountId);
   if (data) renderAccount(accountId, data);
 }
