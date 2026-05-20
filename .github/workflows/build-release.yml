@@ -21,12 +21,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Remove China mirror config
+        run: npm config delete electron_mirror
+
       - name: Build Windows portable
         run: npx electron-builder --win --publish never
 
       - name: Upload artifacts to Release
         uses: softprops/action-gh-release@v2
         with:
+          generate_release_notes: true
           files: |
             dist/*.exe
             dist/*.yml
@@ -45,6 +49,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Remove China mirror config
+        run: npm config delete electron_mirror
+
       - name: Build macOS
         run: npx electron-builder --mac --publish never
         env:
@@ -57,6 +64,7 @@ jobs:
       - name: Upload artifacts to Release
         uses: softprops/action-gh-release@v2
         with:
+          generate_release_notes: true
           files: |
             dist/*.dmg
             dist/*.zip
