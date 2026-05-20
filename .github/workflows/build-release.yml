@@ -20,8 +20,7 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-- name: Build Windows portable
+      - name: Build Windows portable
         run: npx electron-builder --win --publish never
 
       - name: Upload artifacts to Release
@@ -45,8 +44,7 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-- name: Build macOS
+      - name: Build macOS
         run: npx electron-builder --mac --publish never
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
