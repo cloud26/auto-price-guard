@@ -21,10 +21,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Remove China mirror config
-        run: node -e "require('fs').writeFileSync('.npmrc', require('fs').readFileSync('.npmrc','utf8').replace(/^.*electron_mirror.*$/gm,'').trim()+'\n')"
-
-      - name: Build Windows portable
+- name: Build Windows portable
         run: npx electron-builder --win --publish never
 
       - name: Upload artifacts to Release
@@ -49,10 +46,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Remove China mirror config
-        run: node -e "require('fs').writeFileSync('.npmrc', require('fs').readFileSync('.npmrc','utf8').replace(/^.*electron_mirror.*$/gm,'').trim()+'\n')"
-
-      - name: Build macOS
+- name: Build macOS
         run: npx electron-builder --mac --publish never
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}

@@ -6,3 +6,4 @@ screenshot*
 .env
 .env.local
 .claude/settings.local.json
+.npmrc
