@@ -6,6 +6,7 @@
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --mac",
+    "build:win": "electron-builder --win",
     "build:dmg": "electron-builder --mac dmg",
     "build:dir": "electron-builder --mac dir",
     "publish": "electron-builder --mac --publish always",
@@ -40,6 +41,12 @@
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "win": {
+      "icon": "build/icon.png",
+      "target": [
+        "portable"
+      ]
     },
     "files": [
       "main.js",
