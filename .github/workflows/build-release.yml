@@ -22,7 +22,7 @@ jobs:
         run: npm ci
 
       - name: Remove China mirror config
-        run: npm config delete electron_mirror
+        run: node -e "require('fs').writeFileSync('.npmrc', require('fs').readFileSync('.npmrc','utf8').replace(/^.*electron_mirror.*$/gm,'').trim()+'\n')"
 
       - name: Build Windows portable
         run: npx electron-builder --win --publish never
@@ -50,7 +50,7 @@ jobs:
         run: npm ci
 
       - name: Remove China mirror config
-        run: npm config delete electron_mirror
+        run: node -e "require('fs').writeFileSync('.npmrc', require('fs').readFileSync('.npmrc','utf8').replace(/^.*electron_mirror.*$/gm,'').trim()+'\n')"
 
       - name: Build macOS
         run: npx electron-builder --mac --publish never
