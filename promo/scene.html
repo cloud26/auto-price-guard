@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>价保助手 宣传片</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400&display=block" rel="stylesheet">
+<style>
+  :root {
+    --accent: #E03B3B; --tb: #FF6A00; --success: #2FA85C;
+    --bg: #F5F5F7; --surface: #fff; --inset: #F0F0F2;
+    --text: #1D1D1F; --muted: rgba(29,29,31,.56); --subtle: rgba(29,29,31,.38);
+    --line: rgba(0,0,0,.06);
+    --font: "Noto Sans SC", "PingFang SC", sans-serif;
+    --mono: "JetBrains Mono", "Noto Sans SC", monospace;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1280px; height: 720px; overflow: hidden; }
+  body {
+    font-family: var(--font); color: var(--text);
+    background: radial-gradient(1200px 700px at 15% 10%, #fff3ee 0%, #fde3dc 45%, #f6cfc6 100%);
+    position: relative;
+  }
+  .num { font-variant-numeric: tabular-nums; }
+  .layer { position: absolute; inset: 0; }
+  .blob { position: absolute; border-radius: 50%; filter: blur(60px); opacity: .55; }
+
+  /* intro / outro */
+  .center { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .icon { width: 132px; height: 132px; border-radius: 30px; box-shadow: 0 20px 50px rgba(224,59,59,.28); }
+  .title { font-size: 76px; font-weight: 900; letter-spacing: 6px; margin-top: 26px; }
+  .tagline { font-size: 30px; font-weight: 400; color: var(--muted); margin-top: 14px; letter-spacing: 2px; }
+  .tagline b { color: var(--accent); font-weight: 700; }
+
+  /* captions */
+  .captions { position: absolute; left: 90px; top: 0; bottom: 0; width: 470px; }
+  .cap { position: absolute; left: 0; top: 50%; width: 100%; }
+  .cap .step { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 3px; }
+  .cap h2 { font-size: 50px; font-weight: 900; line-height: 1.25; margin-top: 14px; letter-spacing: 1px; }
+  .cap h2 em { font-style: normal; color: var(--accent); }
+  .cap p { font-size: 22px; color: var(--muted); margin-top: 18px; line-height: 1.6; }
+
+  /* app window */
+  .win {
+    position: absolute; left: 620px; top: 40px; width: 600px; height: 640px;
+    background: var(--bg); border-radius: 14px; overflow: hidden;
+    box-shadow: 0 40px 90px rgba(120,30,20,.28), 0 0 0 1px rgba(0,0,0,.08);
+    transform-origin: 50% 50%;
+  }
+  .tbar { height: 38px; background: #ECECEE; border-bottom: 1px solid var(--line); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 500; color: rgba(0,0,0,.65); position: relative; }
+  .lights { position: absolute; left: 14px; top: 13px; display: flex; gap: 8px; }
+  .lights i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; position: relative; overflow: hidden; }
+  .hero { margin: 14px 22px 8px; padding: 14px 18px 8px; }
+  .hero::before { content: ''; position: absolute; top: -60px; right: -60px; width: 240px; height: 240px; background: radial-gradient(circle, rgba(224,59,59,.08) 0%, transparent 70%); }
+  .lbl { font-size: 12px; color: var(--muted); letter-spacing: .3px; }
+  .amt { font-size: 38px; font-weight: 300; color: var(--accent); display: flex; align-items: baseline; gap: 3px; line-height: 1.1; margin-top: 2px; letter-spacing: -1px; }
+  .amt .sym { font-size: 22px; opacity: .8; }
+  .amt .dec { font-size: 20px; opacity: .55; }
+  .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .meta b { color: var(--text); font-weight: 500; }
+  .range { position: absolute; right: 18px; top: 14px; display: flex; gap: 4px; background: var(--inset); border-radius: 8px; padding: 2px; font-size: 11px; color: var(--muted); }
+  .range span { padding: 3px 10px; border-radius: 6px; }
+  .range span.on { background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .chart { height: 112px; margin-top: 6px; position: relative; }
+  .chart svg { width: 100%; height: 100%; display: block; }
+
+  .table { margin: 6px 22px 0; }
+  .thead, .row { display: grid; grid-template-columns: 2fr 1fr 2fr 1.2fr 1fr 1fr; column-gap: 10px; align-items: center; }
+  .thead { padding: 7px 14px; border-bottom: 1px solid var(--line); font-size: 11px; color: var(--subtle); }
+  .thead div:last-child { text-align: center; }
+  .row { padding: 11px 14px; border-bottom: 1px solid var(--line); font-size: 12px; position: relative; }
+  .row:last-child { border-bottom: none; }
+  .name { display: flex; align-items: center; gap: 6px; font-weight: 500; font-size: 12.5px; white-space: nowrap; }
+  .ptag { font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px; }
+  .ptag.jd { color: var(--accent); background: rgba(224,59,59,.08); }
+  .ptag.tb { color: var(--tb); background: rgba(255,106,0,.08); }
+  .login { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; padding: 1px 8px; border-radius: 999px; background: rgba(47,168,92,.08); border: 1px solid rgba(47,168,92,.2); color: var(--success); white-space: nowrap; }
+  .login i { width: 5px; height: 5px; border-radius: 50%; background: var(--success); display: block; }
+  .sub { font-size: 11px; color: var(--subtle); margin-top: 1px; }
+  .ok { color: var(--success); }
+  .btn { padding: 4px 10px; background: var(--accent); color: #fff; border-radius: 6px; font-size: 11px; font-weight: 500; justify-self: center; white-space: nowrap; }
+  .btn.loading { background: var(--inset); color: var(--muted); }
+  .sweep { position: absolute; left: 14px; right: 14px; bottom: 0; height: 2px; background: var(--inset); overflow: hidden; opacity: 0; }
+  .sweep i { position: absolute; top: 0; width: 33%; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), transparent); }
+
+  .logwrap { margin: 12px 22px 0; }
+  .loghead { display: flex; font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  .loghead span:first-child { flex: 1; }
+  .loghead span:last-child { color: var(--subtle); }
+  .log { background: #1C1C1E; border-radius: 12px; padding: 10px 14px; font-family: var(--mono); font-size: 11.5px; line-height: 1.7; color: rgba(181,181,186,.55); height: 148px; overflow: hidden; }
+  .log .ts { color: rgba(181,181,186,.35); }
+  .log .jd { color: #FF8E8E; } .log .tb { color: #FFB87A; }
+  .log .s { color: #9BE39B; }
+  .log div { white-space: nowrap; }
+
+  /* notification */
+  .toast {
+    position: absolute; right: 26px; top: 26px; width: 360px; padding: 14px 16px;
+    background: rgba(250,250,252,.92); backdrop-filter: blur(20px);
+    border-radius: 18px; box-shadow: 0 18px 50px rgba(0,0,0,.2), 0 0 0 1px rgba(0,0,0,.06);
+    display: flex; gap: 12px; align-items: center;
+  }
+  .toast img { width: 40px; height: 40px; border-radius: 9px; }
+  .toast .t1 { font-size: 14px; font-weight: 700; display: flex; }
+  .toast .t1 span:last-child { margin-left: auto; font-weight: 400; color: var(--subtle); font-size: 12px; }
+  .toast .t2 { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .toast .t2 b { color: var(--accent); }
+
+  .pulse { position: absolute; border-radius: 10px; border: 2px solid var(--accent); pointer-events: none; }
+
+  .pills { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 26px; }
+  .pill { font-size: 20px; padding: 10px 20px; border-radius: 999px; background: rgba(255,255,255,.75); border: 1px solid rgba(224,59,59,.18); color: var(--text); font-weight: 500; }
+  .pill b { color: var(--accent); margin-right: 6px; }
+  .cta { margin-top: 34px; font-size: 24px; font-weight: 700; color: #fff; background: var(--accent); padding: 14px 34px; border-radius: 999px; box-shadow: 0 14px 30px rgba(224,59,59,.35); letter-spacing: 1px; }
+  .url { margin-top: 18px; font-size: 20px; color: var(--muted); font-family: var(--mono); }
+</style>
+</head>
+<body>
+  <div class="blob" id="b1" style="width:520px;height:520px;background:#ffb39c;left:-120px;top:-140px"></div>
+  <div class="blob" id="b2" style="width:460px;height:460px;background:#ffd4a8;right:-100px;bottom:-160px"></div>
+
+  <!-- intro -->
+  <div class="layer center" id="intro">
+    <img class="icon" id="introIcon" src="../build/icon.png">
+    <div class="title" id="introTitle">价保助手</div>
+    <div class="tagline" id="introTag">买完就降价？<b>自动帮你把差价要回来</b></div>
+  </div>
+
+  <!-- main -->
+  <div class="layer" id="main">
+    <div class="captions">
+      <div class="cap" id="cap1">
+        <div class="step">01 · 双平台</div>
+        <h2>京东 + 淘宝<br><em>自动申请价保</em></h2>
+        <p>登录一次，订单降价自动退差价，<br>再也不用一单一单去点。</p>
+      </div>
+      <div class="cap" id="cap2">
+        <div class="step">02 · 定时运行</div>
+        <h2>后台定时执行<br><em>全程无需操心</em></h2>
+        <p>间隔 30 分钟 ~ 24 小时可调，<br>关掉窗口也在菜单栏继续跑。</p>
+      </div>
+      <div class="cap" id="cap3">
+        <div class="step">03 · 到账提醒</div>
+        <h2>退款到账<br><em>系统通知提醒你</em></h2>
+        <p>每一笔退款金额、件数，<br>都自动统计进省钱曲线。</p>
+      </div>
+      <div class="cap" id="cap4">
+        <div class="step">04 · 多账号</div>
+        <h2>多账号管理<br><em>全家一起省钱</em></h2>
+        <p>同一平台可添加多个账号，<br>各自独立定时、独立统计。</p>
+      </div>
+    </div>
+
+    <div class="win" id="win">
+      <div class="tbar">
+        <div class="lights"><i style="background:#FF5F57"></i><i style="background:#FEBC2E"></i><i style="background:#28C840"></i></div>
+        价保助手
+      </div>
+      <div class="card hero" id="hero">
+        <div class="lbl">30天累计省钱</div>
+        <div class="amt num"><span class="sym">¥</span><span id="amtInt">0</span><span class="dec" id="amtDec">.00</span></div>
+        <div class="meta"><b class="num" id="cnt">0</b> 件商品成功退款</div>
+        <div class="range"><span>14天</span><span class="on">30天</span></div>
+        <div class="chart">
+          <svg viewBox="0 0 520 112" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stop-color="#E03B3B" stop-opacity=".22"/>
+                <stop offset="1" stop-color="#E03B3B" stop-opacity="0"/>
+              </linearGradient>
+              <clipPath id="clip"><rect id="clipRect" x="0" y="0" width="0" height="112"/></clipPath>
+            </defs>
+            <g clip-path="url(#clip)">
+              <path id="area" fill="url(#g)"/>
+              <path id="line" fill="none" stroke="#E03B3B" stroke-width="2.2" stroke-linejoin="round"/>
+            </g>
+            <circle id="dotEnd" r="4" fill="#E03B3B" stroke="#fff" stroke-width="2"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="card table" id="table">
+        <div class="thead"><div>账号</div><div>状态</div><div>上次结果</div><div>下次运行</div><div>间隔</div><div>操作</div></div>
+        <div class="row" data-row="0">
+          <div class="name"><span class="ptag jd">京东</span>我的京东</div>
+          <div><span class="login"><i></i>已登录</span></div>
+          <div class="ok" id="r0res">退款 ¥186.40<div class="sub">10-09 09:43</div></div>
+          <div id="r0next">11:43<div class="sub">2 小时后</div></div>
+          <div>每 2 小时</div>
+          <div class="btn" id="r0btn">执行</div>
+          <div class="sweep" id="r0sweep"><i id="r0sweepi"></i></div>
+        </div>
+        <div class="row" data-row="1">
+          <div class="name"><span class="ptag tb">淘宝</span>我的淘宝</div>
+          <div><span class="login"><i></i>已登录</span></div>
+          <div>已申请(无退款)<div class="sub">10-09 09:37</div></div>
+          <div>11:37<div class="sub">2 小时后</div></div>
+          <div>每 2 小时</div>
+          <div class="btn">执行</div>
+        </div>
+        <div class="row" data-row="2">
+          <div class="name"><span class="ptag jd">京东</span>妈妈的京东</div>
+          <div><span class="login"><i></i>已登录</span></div>
+          <div class="ok">退款 ¥52.00<div class="sub">10-09 08:15</div></div>
+          <div>14:15<div class="sub">6 小时后</div></div>
+          <div>每 6 小时</div>
+          <div class="btn">执行</div>
+        </div>
+        <div class="row" data-row="3">
+          <div class="name"><span class="ptag tb">淘宝</span>爸爸的淘宝</div>
+          <div><span class="login"><i></i>已登录</span></div>
+          <div>已申请(无退款)<div class="sub">10-09 07:02</div></div>
+          <div>19:02<div class="sub">12 小时后</div></div>
+          <div>每 12 小时</div>
+          <div class="btn">执行</div>
+        </div>
+      </div>
+
+      <div class="logwrap" id="logwrap">
+        <div class="loghead"><span>运行日志</span><span>最近 200 条</span></div>
+        <div class="log" id="log"></div>
+      </div>
+
+      <div class="pulse" id="pulse"></div>
+    </div>
+
+    <div class="toast" id="toast">
+      <img src="../build/icon.png">
+      <div style="flex:1">
+        <div class="t1"><span>价保成功 🎉</span><span>刚刚</span></div>
+        <div class="t2">[京东] 我的京东 本次退款 <b>¥23.50</b>，共 2 件</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- outro -->
+  <div class="layer center" id="outro">
+    <img class="icon" id="outIcon" src="../build/icon.png" style="width:96px;height:96px;border-radius:22px">
+    <div class="title" id="outTitle" style="font-size:60px;margin-top:20px">价保助手</div>
+    <div class="pills" id="outPills">
+      <div class="pill"><b>✓</b>京东 / 淘宝</div>
+      <div class="pill"><b>✓</b>定时自动价保</div>
+      <div class="pill"><b>✓</b>退款通知</div>
+      <div class="pill"><b>✓</b>多账号</div>
+      <div class="pill"><b>✓</b>自动更新</div>
+    </div>
+    <div class="cta" id="outCta">免费下载 · macOS</div>
+    <div class="url" id="outUrl">github.com/cloud26/auto-price-guard</div>
+  </div>
+
+<script>
+const DURATION = 20;
+const $ = id => document.getElementById(id);
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const easeOut = x => 1 - Math.pow(1 - x, 3);
+const easeInOut = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const backOut = x => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+// fade window: in over [a, a+d], out over [b-d, b]
+const win = (t, a, b, d = .45) => Math.min(easeOut(prog(t, a, a + d)), 1 - easeInOut(prog(t, b - d, b)));
+const set = (el, op, tx = 0, ty = 0, sc = 1) => {
+  el.style.opacity = op;
+  el.style.transform = `translate(${tx}px, ${ty}px) scale(${sc})`;
+  el.style.visibility = op <= 0.001 ? 'hidden' : 'visible';
+};
+
+// chart data: 30 days cumulative-ish daily savings
+const daily = [40,0,120,35,80,0,210,60,15,95,0,160,45,130,70,0,240,55,90,30,180,0,75,140,60,110,0,220,85,186];
+const W = 520, H = 112;
+let acc = 0;
+const cum = daily.map(v => (acc += v));
+const maxV = acc;
+const pts = cum.map((v, i) => [i / (cum.length - 1) * W, H - 6 - v / maxV * (H - 18)]);
+function smooth(p) {
+  let d = `M${p[0][0]},${p[0][1]}`;
+  for (let i = 1; i < p.length; i++) {
+    const [x0, y0] = p[i - 1], [x1, y1] = p[i];
+    const cx = (x0 + x1) / 2;
+    d += ` C${cx},${y0} ${cx},${y1} ${x1},${y1}`;
+  }
+  return d;
+}
+const lineD = smooth(pts);
+$('line').setAttribute('d', lineD);
+$('area').setAttribute('d', lineD + ` L${W},${H} L0,${H} Z`);
+
+const LOGS = [
+  [2.9, '<span class="ts">[09:58:28]</span> <span class="s">应用启动完成</span>'],
+  [3.3, '<span class="ts">[09:58:28]</span> <span class="jd">[京东]</span> 我的京东 登录状态有效'],
+  [3.6, '<span class="ts">[09:58:28]</span> <span class="tb">[淘宝]</span> 我的淘宝 登录状态有效'],
+  [3.9, '<span class="ts">[09:58:29]</span> 定时任务已启动，共 4 个账号'],
+  [6.9, '<span class="ts">[10:00:00]</span> <span class="jd">[京东]</span> 我的京东 开始执行一键价保…'],
+  [7.7, '<span class="ts">[10:00:03]</span> <span class="jd">[京东]</span> 扫描订单 37 笔，发现降价 2 件'],
+  [8.6, '<span class="ts">[10:00:05]</span> <span class="jd">[京东]</span> 正在提交价保申请…'],
+  [9.9, '<span class="ts">[10:00:07]</span> <span class="s">[京东] 价保成功，退款 ¥23.50（2 件）</span>'],
+  [10.4,'<span class="ts">[10:00:07]</span> 下次运行 12:00'],
+];
+
+function fmt(n) {
+  const [i, d] = n.toFixed(2).split('.');
+  return [Number(i).toLocaleString('en-US'), '.' + d];
+}
+
+function render(t) {
+  // ── intro 0 – 2.6
+  const iOut = 1 - easeInOut(prog(t, 2.1, 2.6));
+  set($('introIcon'), easeOut(prog(t, .1, .6)) * iOut, 0, 0, (0.6 + 0.4 * backOut(prog(t, .1, .7))) * (1 - .1 * (1 - iOut)));
+  set($('introTitle'), easeOut(prog(t, .45, 1.0)) * iOut, 0, 24 * (1 - easeOut(prog(t, .45, 1.0))));
+  set($('introTag'), easeOut(prog(t, .85, 1.4)) * iOut, 0, 24 * (1 - easeOut(prog(t, .85, 1.4))));
+  $('intro').style.visibility = t < 2.7 ? 'visible' : 'hidden';
+
+  // ── main 2.4 – 17
+  const mainOp = easeOut(prog(t, 2.4, 2.9)) * (1 - easeInOut(prog(t, 16.4, 17)));
+  $('main').style.opacity = mainOp;
+  $('main').style.visibility = mainOp > 0 ? 'visible' : 'hidden';
+
+  // window entrance
+  const we = backOut(prog(t, 2.4, 3.2));
+  // step 4: window grows to fit the family accounts and shrinks a bit to stay in frame
+  const grow = easeInOut(prog(t, 12.9, 13.9));
+  const wh = 640 + 116 * grow;
+  $('win').style.height = wh + 'px';
+  $('win').style.top = (360 - wh / 2) + 'px';
+  const wz = 1 - .1 * grow;
+  $('win').style.transform = `translateY(${60 * (1 - we)}px) scale(${(.92 + .08 * we) * wz})`;
+
+  // captions
+  const caps = [['cap1', 2.6, 6.4], ['cap2', 6.4, 9.6], ['cap3', 9.6, 12.8], ['cap4', 12.8, 16.6]];
+  caps.forEach(([id, a, b]) => {
+    const inP = easeOut(prog(t, a + .1, a + .65));
+    const outP = easeInOut(prog(t, b - .4, b));
+    const op = Math.min(inP, 1 - outP);
+    const el = $(id);
+    el.style.opacity = op;
+    el.style.visibility = op > 0 ? 'visible' : 'hidden';
+    el.style.transform = `translateY(calc(-50% + ${30 * (1 - inP) - 30 * outP}px))`;
+  });
+
+  // hero counter: 0 → 3726.92 during 3.0–5.6, then +23.50 at 10.0
+  const base = 3726.92 * easeOut(prog(t, 3.0, 5.6));
+  const bump = 23.50 * easeOut(prog(t, 10.0, 10.8));
+  const [ai, ad] = fmt(base + bump);
+  $('amtInt').textContent = ai; $('amtDec').textContent = ad;
+  $('cnt').textContent = Math.round(459 * easeOut(prog(t, 3.0, 5.6)) + 2 * prog(t, 10.0, 10.8));
+  const amtGlow = Math.sin(Math.PI * prog(t, 10.0, 11.2));
+  document.querySelector('.amt').style.transform = `scale(${1 + .08 * amtGlow})`;
+  document.querySelector('.amt').style.transformOrigin = 'left center';
+
+  // chart reveal
+  const cr = easeInOut(prog(t, 3.0, 5.6));
+  $('clipRect').setAttribute('width', W * cr);
+  const lastP = pts[pts.length - 1];
+  const idx = Math.min(pts.length - 1, Math.floor(cr * (pts.length - 1)));
+  const dp = cr >= 1 ? lastP : pts[idx];
+  $('dotEnd').setAttribute('cx', dp[0]); $('dotEnd').setAttribute('cy', dp[1]);
+  $('dotEnd').style.opacity = cr > 0 ? 1 : 0;
+
+  // table rows stagger in
+  document.querySelectorAll('.row').forEach((r, i) => {
+    let a = 3.2 + i * .18;
+    if (i >= 2) a = 13.0 + (i - 2) * .35; // family accounts appear in step 4
+    const p = easeOut(prog(t, a, a + .45));
+    r.style.opacity = p;
+    r.style.transform = `translateX(${20 * (1 - p)}px)`;
+    r.style.display = (i >= 2 && t < a) ? 'none' : 'grid';
+    r.style.background = (i >= 2) ? `rgba(224,59,59,${.06 * Math.sin(Math.PI * prog(t, a, a + 1.4))})` : '';
+  });
+
+  // row 0 running state 7.0 – 9.9
+  const running = t >= 6.9 && t < 9.9;
+  const btn = $('r0btn');
+  btn.className = 'btn' + (running ? ' loading' : '');
+  btn.textContent = running ? '执行中' : '执行';
+  btn.style.transform = `scale(${1 - .12 * Math.sin(Math.PI * prog(t, 6.6, 6.95))})`;
+  $('r0sweep').style.opacity = running ? 1 : 0;
+  $('r0sweepi').style.left = `${(((t - 6.9) / 1.4) % 1) * 130 - 33}%`;
+  if (t >= 9.9) {
+    $('r0res').innerHTML = '退款 ¥23.50<div class="sub">10-09 10:00</div>';
+    $('r0next').innerHTML = '12:00<div class="sub">2 小时后</div>';
+  } else {
+    $('r0res').innerHTML = '退款 ¥186.40<div class="sub">10-09 09:43</div>';
+    $('r0next').innerHTML = running ? '执行中…<div class="sub">&nbsp;</div>' : '即将执行<div class="sub">10:00</div>';
+  }
+  $('r0res').style.transform = `scale(${1 + .1 * Math.sin(Math.PI * prog(t, 9.9, 10.6))})`;
+  $('r0res').style.transformOrigin = 'left center';
+
+  // click pulse ring on 执行 button
+  const pr = prog(t, 6.6, 7.4);
+  const bRect = btn.getBoundingClientRect(), wRect = $('win').getBoundingClientRect();
+  const sc = wRect.width / 600;
+  const pEl = $('pulse');
+  const ring = 14 * easeOut(pr);
+  pEl.style.left = ((bRect.left - wRect.left) / sc - ring) + 'px';
+  pEl.style.top = ((bRect.top - wRect.top) / sc - ring) + 'px';
+  pEl.style.width = (bRect.width / sc + ring * 2) + 'px';
+  pEl.style.height = (bRect.height / sc + ring * 2) + 'px';
+  pEl.style.opacity = pr > 0 && pr < 1 ? (1 - pr) : 0;
+
+  // log
+  const visible = LOGS.filter(([ts]) => t >= ts);
+  const lines = visible.map(([ts, html]) => {
+    const p = easeOut(prog(t, ts, ts + .3));
+    return `<div style="opacity:${p};transform:translateY(${6 * (1 - p)}px)">${html}</div>`;
+  });
+  const cursor = `<div style="opacity:${0.4 + 0.4 * (Math.floor(t * 2) % 2)}">▸ _</div>`;
+  const keep = lines.slice(-6);
+  $('log').innerHTML = keep.join('') + cursor;
+
+  // toast 10.0 – 12.6
+  const tin = backOut(prog(t, 10.0, 10.6)), tout = easeInOut(prog(t, 12.2, 12.7));
+  set($('toast'), Math.min(easeOut(prog(t, 10.0, 10.4)), 1 - tout), 400 * (1 - tin) + 400 * tout, 0);
+
+  // ── outro 16.8 – 20
+  $('outro').style.visibility = t > 16.7 ? 'visible' : 'hidden';
+  set($('outIcon'), easeOut(prog(t, 16.9, 17.4)), 0, 0, .6 + .4 * backOut(prog(t, 16.9, 17.5)));
+  set($('outTitle'), easeOut(prog(t, 17.1, 17.6)), 0, 20 * (1 - easeOut(prog(t, 17.1, 17.6))));
+  document.querySelectorAll('#outPills .pill').forEach((p, i) => {
+    const a = 17.4 + i * .12, q = easeOut(prog(t, a, a + .4));
+    set(p, q, 0, 16 * (1 - q), .9 + .1 * q);
+  });
+  set($('outCta'), easeOut(prog(t, 18.1, 18.6)), 0, 0, (.8 + .2 * backOut(prog(t, 18.1, 18.7))) * (1 + .03 * Math.sin(Math.max(0, t - 18.7) * 4)));
+  set($('outUrl'), easeOut(prog(t, 18.4, 18.9)));
+}
+
+window.DURATION = DURATION;
+window.render = render;
+window.ready = document.fonts.ready.then(() => Promise.all(
+  [...document.images].map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; }))
+));
+
+// live preview when opened directly in a browser
+if (!navigator.webdriver) {
+  const t0 = performance.now();
+  const loop = () => { render(((performance.now() - t0) / 1000) % DURATION); requestAnimationFrame(loop); };
+  loop();
+} else {
+  render(0);
+}
+</script>
+</body>
+</html>

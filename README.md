@@ -4,7 +4,9 @@
 
 支持同一平台添加多个账号，帮全家人一起省钱。
 
-![screenshot](screenshot.png)
+[![价保助手宣传视频](promo/promo.webp)](promo/promo.mp4)
+
+<sub>▶ 点击查看高清 MP4 · 视频由 [`promo/`](promo/) 下的脚本生成：`node promo/render.js`</sub>
 
 ## 功能
 
